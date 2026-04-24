@@ -36,11 +36,21 @@ notificationsRouter.post('/test/email', async (req, res) => {
     return;
   }
   try {
-    await sendEmail({
+    const result = await sendEmail({
       to: user.email,
       subject: '[SmartScrape] Test email',
       text: 'If you received this, your email channel is working.',
     });
+    if (!result.delivered) {
+      res.status(200).json(
+        ok({
+          sent: false,
+          warning:
+            'SMTP is not configured on this server. The test message was written to the server log instead of delivered. Set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS to send real email.',
+        }),
+      );
+      return;
+    }
     res.status(200).json(ok({ sent: true }));
   } catch (err) {
     res.status(502).json(fail('EMAIL_FAILED', err instanceof Error ? err.message : 'Email failed'));

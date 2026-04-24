@@ -1,7 +1,8 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
 import { FormField } from './ui/FormField';
+import { api } from '../lib/api';
 import type {
   ExtractionSchema,
   FieldType,
@@ -330,23 +331,19 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
 
       <Section title="Google Sheets (optional)">
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          After each run, extracted rows are appended to the sheet. Connect Google in Settings first, then paste the
-          Sheet ID here.
+          After each run, extracted rows are appended to the sheet. Connect Google in Settings first, then pick a sheet
+          below or paste an ID directly.
         </p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField
-            label="Sheet ID"
-            value={v.google_sheet_id ?? ''}
-            onChange={(e) => setV({ ...v, google_sheet_id: extractSheetId(e.target.value) })}
-            placeholder="Paste the full URL or just the ID"
-          />
-          <FormField
-            label="Tab name"
-            value={v.sheet_tab_name ?? ''}
-            onChange={(e) => setV({ ...v, sheet_tab_name: e.target.value || null })}
-            placeholder="Sheet1"
-          />
-        </div>
+        <SheetPicker
+          value={v.google_sheet_id ?? ''}
+          onChange={(id) => setV({ ...v, google_sheet_id: id })}
+        />
+        <FormField
+          label="Tab name"
+          value={v.sheet_tab_name ?? ''}
+          onChange={(e) => setV({ ...v, sheet_tab_name: e.target.value || null })}
+          placeholder="Sheet1"
+        />
       </Section>
 
       <Section title="Notifications">
@@ -385,6 +382,95 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
         </Button>
       </div>
     </form>
+  );
+}
+
+type SheetSummary = { id: string; name: string; modifiedTime: string | null; webViewLink: string | null };
+
+/**
+ * Sheet picker: tries to list the user's spreadsheets via /api/google/sheets
+ * (requires the drive.metadata.readonly scope). If that fails (not connected,
+ * missing scope, network error) we gracefully fall back to a manual ID field
+ * so existing users aren't locked out of linking a sheet.
+ */
+function SheetPicker({ value, onChange }: { value: string; onChange: (id: string | null) => void }) {
+  const [sheets, setSheets] = useState<SheetSummary[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const res = await api<{ sheets: SheetSummary[] }>('/api/google/sheets');
+      if (cancelled) return;
+      if (res.success) {
+        setSheets(res.data.sheets);
+      } else {
+        setLoadError(res.error.message);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return <p className="text-xs text-gray-500">Loading your sheets…</p>;
+  }
+
+  // Fallback to plain ID field when the picker can't load.
+  if (loadError || !sheets) {
+    return (
+      <div>
+        {loadError && (
+          <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">
+            Couldn't list your sheets ({loadError}). Paste an ID or URL instead.
+          </p>
+        )}
+        <FormField
+          label="Sheet ID or URL"
+          value={value}
+          onChange={(e) => onChange(extractSheetId(e.target.value))}
+          placeholder="Paste the full URL or just the ID"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Sheet</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+      >
+        <option value="">— None —</option>
+        {value && !sheets.some((s) => s.id === value) && (
+          <option value={value}>{`(manually entered) ${value}`}</option>
+        )}
+        {sheets.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-xs text-gray-500">
+        Not seeing the sheet you want?{' '}
+        <button
+          type="button"
+          className="text-indigo-600 hover:underline dark:text-indigo-400"
+          onClick={() => {
+            const pasted = window.prompt('Paste the sheet URL or ID');
+            if (pasted) onChange(extractSheetId(pasted));
+          }}
+        >
+          Paste an ID
+        </button>{' '}
+        (e.g. shared-with-you sheets).
+      </p>
+    </div>
   );
 }
 

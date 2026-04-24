@@ -16,6 +16,7 @@ export default function JobDetail() {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [runningNow, setRunningNow] = useState(false);
+  const [pushingSheets, setPushingSheets] = useState(false);
   const [openDiff, setOpenDiff] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -55,6 +56,20 @@ export default function JobDetail() {
     } else {
       toast.info('Run queued.');
       void load();
+    }
+  }
+
+  async function pushSheets() {
+    setPushingSheets(true);
+    const res = await api<{ appended: number; runId: string }>(
+      `/api/jobs/${id}/export/sheets`,
+      { method: 'POST' },
+    );
+    setPushingSheets(false);
+    if (!res.success) {
+      toast.error(res.error.message);
+    } else {
+      toast.success(`Appended ${res.data.appended} row${res.data.appended === 1 ? '' : 's'} to Sheets.`);
     }
   }
 
@@ -105,10 +120,15 @@ export default function JobDetail() {
               {job.urls.length} URL{job.urls.length === 1 ? '' : 's'} · {job.schedule ?? 'Manual'} · {job.ai_provider}/{job.ai_model}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button onClick={runNow} loading={runningNow}>
               Run now
             </Button>
+            {job.google_sheet_id && (
+              <Button variant="secondary" loading={pushingSheets} onClick={pushSheets}>
+                Push to Sheets
+              </Button>
+            )}
             <Link to={`/jobs/${job.id}/edit`}>
               <Button variant="secondary">Edit</Button>
             </Link>
