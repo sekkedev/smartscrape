@@ -7,6 +7,8 @@ import { extract, hashItem } from './ai-extractor.js';
 import { scrape } from './scraper.js';
 import { diffRun } from './change-detector.js';
 import { dispatch, evaluateRules } from './notification-service.js';
+import { pushRows } from './google-sheets.js';
+import { findConnection } from '../db/googleConnections.js';
 
 export type RunSummary = {
   runId: string;
@@ -82,6 +84,24 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
     }
 
     await insertExtractedData(run.id, job.id, allBatches);
+
+    // Optional: export to Google Sheets if the job has one linked and the user is connected.
+    if (job.google_sheet_id && allBatches.length > 0) {
+      try {
+        await updateRun(run.id, { status: 'exporting' });
+        const conn = await findConnection(job.user_id);
+        if (conn) {
+          await pushRows({
+            userId: job.user_id,
+            sheetId: job.google_sheet_id,
+            tabName: job.sheet_tab_name,
+            rows: allBatches.map((b) => b.data),
+          });
+        }
+      } catch (err) {
+        console.error('[runner] sheets export failed', err);
+      }
+    }
 
     await updateRun(run.id, {
       status: 'completed',

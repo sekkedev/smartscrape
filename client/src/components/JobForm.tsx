@@ -24,6 +24,8 @@ export type JobFormValues = {
   notification_rules: NotificationRule[];
   ai_provider: Provider;
   ai_model: string;
+  google_sheet_id: string | null;
+  sheet_tab_name: string | null;
 };
 
 const SCHEDULE_OPTIONS: { label: string; value: string | null }[] = [
@@ -48,6 +50,8 @@ export function jobToFormValues(job: Job): JobFormValues {
     notification_rules: job.notification_rules,
     ai_provider: job.ai_provider,
     ai_model: job.ai_model,
+    google_sheet_id: job.google_sheet_id,
+    sheet_tab_name: job.sheet_tab_name,
   };
 }
 
@@ -63,6 +67,8 @@ export const EMPTY_FORM: JobFormValues = {
   notification_rules: [],
   ai_provider: 'openrouter',
   ai_model: 'openai/gpt-4o-mini',
+  google_sheet_id: null,
+  sheet_tab_name: null,
 };
 
 type Props = {
@@ -305,6 +311,27 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
             value={v.ai_model}
             onChange={(e) => setV({ ...v, ai_model: e.target.value })}
             placeholder="openai/gpt-4o-mini"
+          />
+        </div>
+      </Section>
+
+      <Section title="Google Sheets (optional)">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          After each run, extracted rows are appended to the sheet. Connect Google in Settings first, then paste the
+          Sheet ID here.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField
+            label="Sheet ID"
+            value={v.google_sheet_id ?? ''}
+            onChange={(e) => setV({ ...v, google_sheet_id: e.target.value || null })}
+            placeholder="1a2b3c4d... (from the sheet URL)"
+          />
+          <FormField
+            label="Tab name"
+            value={v.sheet_tab_name ?? ''}
+            onChange={(e) => setV({ ...v, sheet_tab_name: e.target.value || null })}
+            placeholder="Sheet1"
           />
         </div>
       </Section>

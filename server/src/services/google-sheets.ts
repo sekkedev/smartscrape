@@ -1,0 +1,188 @@
+import { google } from 'googleapis';
+import jwt from 'jsonwebtoken';
+import { requireSecrets } from '../config/env.js';
+import { decrypt, encrypt } from '../config/encryption.js';
+import {
+  findConnection,
+  updateAccessToken,
+  upsertConnection,
+} from '../db/googleConnections.js';
+
+// Minimal scopes: write sheets + read user's email to display which account is connected.
+export const SHEETS_SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/userinfo.email',
+];
+
+function clientConfig() {
+  const id = process.env.GOOGLE_CLIENT_ID ?? '';
+  const secret = process.env.GOOGLE_CLIENT_SECRET ?? '';
+  const redirect = process.env.GOOGLE_REDIRECT_URI ?? 'http://localhost:3000/api/google/callback';
+  if (!id || !secret) {
+    throw new Error('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not configured');
+  }
+  return { id, secret, redirect };
+}
+
+export function isConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+function oauthClient() {
+  const c = clientConfig();
+  return new google.auth.OAuth2(c.id, c.secret, c.redirect);
+}
+
+/**
+ * Build the OAuth consent URL. State carries a short-lived signed token so the
+ * callback can recover the initiating userId without session cookies.
+ */
+export function buildAuthUrl(userId: string): string {
+  const { jwtAccessSecret } = requireSecrets();
+  const state = jwt.sign({ sub: userId }, jwtAccessSecret, { expiresIn: '10m' });
+  return oauthClient().generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent', // force refresh_token on re-auth
+    scope: SHEETS_SCOPES,
+    state,
+  });
+}
+
+export type StateVerify = { ok: true; userId: string } | { ok: false; error: string };
+
+export function verifyState(state: string): StateVerify {
+  try {
+    const { jwtAccessSecret } = requireSecrets();
+    const payload = jwt.verify(state, jwtAccessSecret);
+    if (typeof payload !== 'object' || !payload || !('sub' in payload)) {
+      return { ok: false, error: 'Invalid state' };
+    }
+    return { ok: true, userId: String((payload as { sub: unknown }).sub) };
+  } catch {
+    return { ok: false, error: 'Invalid or expired state' };
+  }
+}
+
+/** Exchange a callback code for tokens + the connected email, then persist. */
+export async function exchangeAndStore(userId: string, code: string): Promise<{ email: string | null }> {
+  const client = oauthClient();
+  const { tokens } = await client.getToken(code);
+  if (!tokens.access_token) throw new Error('Google did not return an access token');
+  if (!tokens.refresh_token) {
+    // On re-auth Google omits refresh_token. If we already have one stored, reuse it.
+    const existing = await findConnection(userId);
+    if (!existing) {
+      throw new Error('Google did not return a refresh_token; revoke app access in your Google account and retry.');
+    }
+    const existingRefresh = decrypt(existing.refresh_token_encrypted);
+    tokens.refresh_token = existingRefresh;
+  }
+
+  client.setCredentials(tokens);
+  const oauth2 = google.oauth2({ version: 'v2', auth: client });
+  const { data } = await oauth2.userinfo.get();
+  const email = data.email ?? null;
+
+  await upsertConnection({
+    userId,
+    accessTokenEncrypted: encrypt(tokens.access_token),
+    refreshTokenEncrypted: encrypt(tokens.refresh_token),
+    tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+    connectedEmail: email,
+  });
+
+  return { email };
+}
+
+/** Return an OAuth2 client with credentials set, refreshing the access token if near expiry. */
+async function authedClient(userId: string) {
+  const conn = await findConnection(userId);
+  if (!conn) throw new Error('No Google connection');
+  const client = oauthClient();
+  const access = decrypt(conn.access_token_encrypted);
+  const refresh = decrypt(conn.refresh_token_encrypted);
+  client.setCredentials({
+    access_token: access,
+    refresh_token: refresh,
+    expiry_date: conn.token_expires_at?.getTime(),
+  });
+  // Refresh if < 60s remaining.
+  const now = Date.now();
+  if (!conn.token_expires_at || conn.token_expires_at.getTime() - now < 60_000) {
+    const { credentials } = await client.refreshAccessToken();
+    if (credentials.access_token) {
+      await updateAccessToken(
+        userId,
+        encrypt(credentials.access_token),
+        credentials.expiry_date ? new Date(credentials.expiry_date) : new Date(now + 3600_000),
+      );
+      client.setCredentials({
+        access_token: credentials.access_token,
+        refresh_token: refresh,
+        expiry_date: credentials.expiry_date,
+      });
+    }
+  }
+  return client;
+}
+
+/**
+ * Append rows to {sheetId}!{tabName}. Writes a header row first if the tab is empty.
+ * `rows` is a list of objects; the first row's keys define the column order.
+ */
+export async function pushRows(args: {
+  userId: string;
+  sheetId: string;
+  tabName?: string | null;
+  rows: Record<string, unknown>[];
+}): Promise<{ appended: number }> {
+  if (args.rows.length === 0) return { appended: 0 };
+  const client = await authedClient(args.userId);
+  const sheets = google.sheets({ version: 'v4', auth: client });
+  const tab = args.tabName && args.tabName.length > 0 ? args.tabName : 'Sheet1';
+  const range = `${tab}!A:Z`;
+
+  const headers = Object.keys(args.rows[0]!);
+
+  // Check if the tab has any rows yet; write a header row if empty.
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId: args.sheetId,
+    range: `${tab}!A1:Z1`,
+  });
+  const hasHeader = Boolean(existing.data.values?.[0]?.length);
+
+  const values: string[][] = [];
+  if (!hasHeader) values.push(headers);
+  for (const row of args.rows) {
+    values.push(
+      headers.map((h) => {
+        const v = row[h];
+        if (v === null || v === undefined) return '';
+        if (typeof v === 'object') return JSON.stringify(v);
+        return String(v);
+      }),
+    );
+  }
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: args.sheetId,
+    range,
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values },
+  });
+
+  return { appended: args.rows.length };
+}
+
+export async function revokeConnection(userId: string): Promise<void> {
+  const conn = await findConnection(userId);
+  if (!conn) return;
+  try {
+    const client = oauthClient();
+    const token = decrypt(conn.access_token_encrypted);
+    await client.revokeToken(token).catch(() => undefined);
+  } catch {
+    // best effort; we still delete the DB row.
+  }
+}
