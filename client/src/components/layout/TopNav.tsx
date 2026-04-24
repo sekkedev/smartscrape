@@ -15,7 +15,7 @@ export function TopNav() {
           <Link to="/" className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
             SmartScrape
           </Link>
-          <nav className="hidden items-center gap-1 sm:flex">
+          <nav className="flex items-center gap-1 overflow-x-auto">
             <NavItem to="/">Home</NavItem>
             <NavItem to="/jobs">Jobs</NavItem>
             <NavItem to="/notifications">Notifications</NavItem>

@@ -80,7 +80,7 @@ export default function Notifications() {
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-950/40">
                 <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
