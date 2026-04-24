@@ -16,6 +16,7 @@ export type RunRow = {
   items_extracted: number;
   tokens_used: number;
   error_message: string | null;
+  export_error: string | null;
   started_at: Date;
   completed_at: Date | null;
 };
@@ -73,7 +74,18 @@ export async function createRun(jobId: string): Promise<RunRow> {
 
 export async function updateRun(
   runId: string,
-  patch: Partial<Pick<RunRow, 'status' | 'urls_scraped' | 'items_extracted' | 'tokens_used' | 'error_message' | 'completed_at'>>,
+  patch: Partial<
+    Pick<
+      RunRow,
+      | 'status'
+      | 'urls_scraped'
+      | 'items_extracted'
+      | 'tokens_used'
+      | 'error_message'
+      | 'export_error'
+      | 'completed_at'
+    >
+  >,
 ): Promise<void> {
   const sets: string[] = [];
   const vals: unknown[] = [];
@@ -86,6 +98,7 @@ export async function updateRun(
   if (patch.items_extracted !== undefined) push('items_extracted', patch.items_extracted);
   if (patch.tokens_used !== undefined) push('tokens_used', patch.tokens_used);
   if (patch.error_message !== undefined) push('error_message', patch.error_message);
+  if (patch.export_error !== undefined) push('export_error', patch.export_error);
   if (patch.completed_at !== undefined) push('completed_at', patch.completed_at);
   if (sets.length === 0) return;
   vals.push(runId);
