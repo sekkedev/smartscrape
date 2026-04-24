@@ -143,4 +143,4 @@ smartscrape/
 
 ## License
 
-MIT.
+[MIT](LICENSE).
