@@ -13,7 +13,8 @@ import {
   toggleJob,
   updateJob,
 } from '../db/jobs.js';
-import { listDataForRun, listRunsForJob } from '../db/runs.js';
+import { countRunsLast24h, listDataForRun, listRunsForJob } from '../db/runs.js';
+import { DAILY_RUN_QUOTA } from '../services/job-runner.js';
 import { toCsv } from '../lib/csv.js';
 import { findForUser as findApiKey, type Provider as ProviderName } from '../db/apiKeys.js';
 import { decrypt } from '../config/encryption.js';
@@ -21,6 +22,8 @@ import { scrape } from '../services/scraper.js';
 import { suggest } from '../services/ai-setup.js';
 import { extract } from '../services/ai-extractor.js';
 import { enqueueNow, syncSchedule } from '../services/job-queue.js';
+import { pushRows } from '../services/google-sheets.js';
+import { findConnection } from '../db/googleConnections.js';
 import { createRun, toDTO as toRunDTO } from '../db/runs.js';
 import { getPool } from '../config/database.js';
 
@@ -315,6 +318,13 @@ jobsRouter.post('/:id/run', validate(idParam, 'params'), async (req, res) => {
     res.status(404).json(fail('NOT_FOUND', 'Job not found'));
     return;
   }
+  const recent = await countRunsLast24h(req.user!.id);
+  if (recent >= DAILY_RUN_QUOTA) {
+    res.status(429).json(
+      fail('QUOTA_EXCEEDED', `Daily run quota reached (${DAILY_RUN_QUOTA}/24h). Try again later.`),
+    );
+    return;
+  }
   const run = await createRun(job.id);
   await enqueueNow({ jobId: job.id, userId: job.user_id, runId: run.id });
   res.status(202).json(ok({ run: toRunDTO(run) }));
@@ -364,6 +374,47 @@ jobsRouter.get('/:id/export/csv/:runId', async (req, res) => {
     return;
   }
   await sendCsvForRun(res, id, runId, req.user!.id, job.name);
+});
+
+jobsRouter.post('/:id/export/sheets', validate(idParam, 'params'), async (req, res) => {
+  const { id } = req.params as unknown as z.infer<typeof idParam>;
+  const job = await findJob(req.user!.id, id);
+  if (!job) {
+    res.status(404).json(fail('NOT_FOUND', 'Job not found'));
+    return;
+  }
+  if (!job.google_sheet_id) {
+    res.status(400).json(fail('NO_SHEET_LINKED', 'This job has no linked Google Sheet'));
+    return;
+  }
+  const conn = await findConnection(req.user!.id);
+  if (!conn) {
+    res.status(400).json(fail('NOT_CONNECTED', 'Google is not connected'));
+    return;
+  }
+  const runs = await listRunsForJob(req.user!.id, id, 1, 0);
+  const latest = runs.find((r) => r.status === 'completed') ?? runs[0];
+  if (!latest) {
+    res.status(404).json(fail('NO_RUNS', 'No runs yet'));
+    return;
+  }
+  const data = await listDataForRun(req.user!.id, latest.id);
+  if (data.length === 0) {
+    res.status(200).json(ok({ appended: 0, runId: latest.id }));
+    return;
+  }
+  try {
+    const result = await pushRows({
+      userId: req.user!.id,
+      sheetId: job.google_sheet_id,
+      tabName: job.sheet_tab_name,
+      rows: data.map((d) => ({ source_url: d.source_url, extracted_at: d.created_at, ...d.data })),
+    });
+    res.status(200).json(ok({ appended: result.appended, runId: latest.id }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Sheets push failed';
+    res.status(502).json(fail('SHEETS_PUSH_FAILED', message));
+  }
 });
 
 jobsRouter.get('/:id/runs', validate(idParam, 'params'), async (req, res) => {
