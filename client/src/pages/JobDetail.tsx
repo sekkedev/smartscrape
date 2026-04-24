@@ -5,6 +5,7 @@ import { RunDiff } from '../components/RunDiff';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { api, downloadBlob } from '../lib/api';
+import { toast } from '../stores/toast';
 import type { Job, Run, RunStatus } from '../types/api';
 
 export default function JobDetail() {
@@ -48,8 +49,13 @@ export default function JobDetail() {
     setRunningNow(true);
     const res = await api<{ run: Run }>(`/api/jobs/${id}/run`, { method: 'POST' });
     setRunningNow(false);
-    if (!res.success) setError(res.error.message);
-    else void load();
+    if (!res.success) {
+      setError(res.error.message);
+      toast.error(res.error.message);
+    } else {
+      toast.info('Run queued.');
+      void load();
+    }
   }
 
   async function remove() {
@@ -57,8 +63,13 @@ export default function JobDetail() {
     setDeleting(true);
     const res = await api(`/api/jobs/${id}`, { method: 'DELETE' });
     setDeleting(false);
-    if (res.success) navigate('/jobs');
-    else setError(res.error.message);
+    if (res.success) {
+      toast.success('Job deleted.');
+      navigate('/jobs');
+    } else {
+      setError(res.error.message);
+      toast.error(res.error.message);
+    }
   }
 
   if (error) {

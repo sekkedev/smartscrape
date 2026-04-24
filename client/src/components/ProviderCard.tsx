@@ -3,6 +3,7 @@ import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
 import { FormField } from './ui/FormField';
 import { api } from '../lib/api';
+import { toast } from '../stores/toast';
 import type { Provider, ProviderSummary, ProviderTestResult } from '../types/api';
 
 type Props = {
@@ -34,14 +35,14 @@ export function ProviderCard({ provider, label, description, summary, onChange }
       body: { provider, apiKey: apiKey.trim() },
     });
     if (!res.success) {
-      setStatus({
-        kind: 'error',
-        message: res.error.details?.[0]?.message ?? res.error.message,
-      });
+      const msg = res.error.details?.[0]?.message ?? res.error.message;
+      setStatus({ kind: 'error', message: msg });
+      toast.error(`${label}: ${msg}`);
       return;
     }
     setApiKey('');
     setStatus({ kind: 'idle' });
+    toast.success(`${label} key saved.`);
     onChange();
   }
 
@@ -60,9 +61,11 @@ export function ProviderCard({ provider, label, description, summary, onChange }
     const res = await api<{ removed: boolean }>(`/api/providers/${provider}`, { method: 'DELETE' });
     if (!res.success) {
       setStatus({ kind: 'error', message: res.error.message });
+      toast.error(res.error.message);
       return;
     }
     setStatus({ kind: 'idle' });
+    toast.success(`${label} key removed.`);
     onChange();
   }
 

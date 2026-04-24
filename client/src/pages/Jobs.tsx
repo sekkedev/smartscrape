@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { TopNav } from '../components/layout/TopNav';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
+import { toast } from '../stores/toast';
 import type { JobListItem, RunStatus } from '../types/api';
 
 type Filter = 'all' | 'active' | 'paused' | 'failed';
@@ -33,7 +34,12 @@ export default function Jobs() {
   }, [filter, load]);
 
   async function toggle(id: string) {
-    await api(`/api/jobs/${id}/toggle`, { method: 'PATCH' });
+    const res = await api<{ job: { enabled: boolean; name: string } }>(`/api/jobs/${id}/toggle`, { method: 'PATCH' });
+    if (res.success) {
+      toast.info(`${res.data.job.name} ${res.data.job.enabled ? 'enabled' : 'paused'}.`);
+    } else {
+      toast.error(res.error.message);
+    }
     void load(filter);
   }
 
@@ -85,7 +91,7 @@ export default function Jobs() {
         ) : jobs.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-950/40">
                 <tr className="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
