@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SmartScrape</title>
+    <script>
+      // Apply saved theme before React mounts to avoid a flash.
+      (function () {
+        try {
+          var v = localStorage.getItem('smartscrape-theme') || 'system';
+          var dark = v === 'dark' || (v === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
     <div id="root"></div>

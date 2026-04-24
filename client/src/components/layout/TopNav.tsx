@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../../stores/auth';
+import { useTheme, type ThemePref } from '../../stores/theme';
 
 export function TopNav() {
   const user = useAuth((s) => s.user);
@@ -42,12 +43,13 @@ export function TopNav() {
               <div className="border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800">
                 {user?.email}
               </div>
+              <ThemeRow />
               <button
                 onClick={() => {
                   setOpen(false);
                   clear();
                 }}
-                className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                className="block w-full border-t border-gray-100 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-800"
               >
                 Log out
               </button>
@@ -56,6 +58,37 @@ export function TopNav() {
         </div>
       </div>
     </header>
+  );
+}
+
+const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+
+function ThemeRow() {
+  const pref = useTheme((s) => s.pref);
+  const setPref = useTheme((s) => s.set);
+  return (
+    <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+      <div className="mb-1.5">Theme</div>
+      <div className="flex gap-1 rounded-md border border-gray-200 p-0.5 dark:border-gray-700">
+        {THEME_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setPref(opt.value)}
+            className={`flex-1 rounded px-2 py-1 text-xs transition ${
+              pref === opt.value
+                ? 'bg-indigo-600 text-white'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
