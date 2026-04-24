@@ -16,6 +16,7 @@ export function TopNav() {
           </Link>
           <nav className="hidden items-center gap-1 sm:flex">
             <NavItem to="/">Home</NavItem>
+            <NavItem to="/jobs">Jobs</NavItem>
             <NavItem to="/settings">Settings</NavItem>
           </nav>
         </div>
