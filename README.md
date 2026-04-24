@@ -22,6 +22,9 @@ AI-powered self-hosted web scraping with structured data extraction, change dete
 # 1. Install dependencies for the whole monorepo
 npm install
 
+# 1a. Install the Chromium browser used by the Playwright scraper
+npx playwright install chromium
+
 # 2. Copy env template and fill in secrets
 cp .env.example .env
 # Generate values:

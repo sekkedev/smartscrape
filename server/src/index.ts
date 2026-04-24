@@ -2,6 +2,7 @@ import express from 'express';
 import { env, requireSecrets } from './config/env.js';
 import { closeDatabase } from './config/database.js';
 import { closeRedis } from './config/redis.js';
+import { closeScraper } from './services/scraper.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import { providersRouter } from './routes/providers.js';
@@ -50,7 +51,7 @@ const server = app.listen(env.port, () => {
 async function shutdown(signal: string): Promise<void> {
   console.log(`[server] received ${signal}, shutting down`);
   server.close(() => undefined);
-  await Promise.allSettled([closeDatabase(), closeRedis()]);
+  await Promise.allSettled([closeDatabase(), closeRedis(), closeScraper()]);
   process.exit(0);
 }
 
