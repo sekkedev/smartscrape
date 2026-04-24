@@ -28,6 +28,20 @@ export type ApiResponse<T> =
   | { success: true; data: T; error: null }
   | { success: false; data: null; error: ApiError };
 
+export type Provider = 'openai' | 'anthropic' | 'openrouter';
+
+export type ProviderSummary = {
+  provider: Provider;
+  connected: boolean;
+  created_at: string;
+};
+
+export type ProviderTestResult = {
+  ok: boolean;
+  latencyMs: number;
+  error?: string;
+};
+
 export type HealthStatus = {
   status: 'healthy' | 'degraded';
   checks: {
