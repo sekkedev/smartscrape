@@ -7,6 +7,7 @@ import { closeScraper } from './services/scraper.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import { jobsRouter } from './routes/jobs.js';
+import { notificationsRouter } from './routes/notifications.js';
 import { providersRouter } from './routes/providers.js';
 import { runsRouter } from './routes/runs.js';
 import { generalLimiter } from './middleware/rateLimit.js';
@@ -28,6 +29,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/providers', providersRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/runs', runsRouter);
+app.use('/api/notifications', notificationsRouter);
 
 app.use((_req, res) => {
   res.status(404).json(fail('NOT_FOUND', 'Route not found'));

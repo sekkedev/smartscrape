@@ -5,6 +5,8 @@ import type { JobRow } from '../db/jobs.js';
 import { createRun, insertExtractedData, updateRun } from '../db/runs.js';
 import { extract, hashItem } from './ai-extractor.js';
 import { scrape } from './scraper.js';
+import { diffRun } from './change-detector.js';
+import { dispatch, evaluateRules } from './notification-service.js';
 
 export type RunSummary = {
   runId: string;
@@ -89,6 +91,18 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
       completed_at: new Date(),
     });
     await getPool().query(`UPDATE scrape_jobs SET last_run_at = now() WHERE id = $1`, [job.id]);
+
+    // Evaluate notification rules against the diff vs the previous run.
+    try {
+      const diff = await diffRun(job.user_id, run.id);
+      if (diff) {
+        const notifs = evaluateRules(job, diff);
+        await dispatch(job, run.id, notifs);
+      }
+    } catch (err) {
+      // Notification failures should not fail the run.
+      console.error('[runner] notification dispatch error', err);
+    }
 
     return {
       runId: run.id,
