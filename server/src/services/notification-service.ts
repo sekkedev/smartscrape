@@ -75,30 +75,40 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
   for (const rule of rules) {
     switch (rule.type) {
       case 'any_change': {
-        if (isFirstRun) break;
+        // One-shot, summary-style rule. OK to fire on the first run ("initial inventory").
         if (diff.added.length > 0 || diff.removed.length > 0 || diff.changed.length > 0) {
           const url = String((diff.added[0] ?? diff.changed[0]?.after ?? diff.removed[0])?.url ?? '');
           out.push({
             type: 'change_detected',
-            message: interpolate(rule.message ?? 'Data changed on {job_name}', { ...globals, url }),
+            message: interpolate(
+              rule.message ?? (isFirstRun ? 'First run for {job_name}: {count} items' : 'Data changed on {job_name}'),
+              {
+                ...globals,
+                url,
+                count: diff.added.length + diff.changed.length + diff.removed.length,
+              },
+            ),
           });
         }
         break;
       }
       case 'new_items': {
-        if (isFirstRun) break;
         if (diff.added.length > 0) {
           out.push({
             type: 'change_detected',
-            message: interpolate(rule.message ?? 'Found {count} new items on {job_name}', {
-              ...globals,
-              count: diff.added.length,
-            }),
+            message: interpolate(
+              rule.message ?? (isFirstRun ? 'First run for {job_name}: {count} items' : 'Found {count} new items on {job_name}'),
+              {
+                ...globals,
+                count: diff.added.length,
+              },
+            ),
           });
         }
         break;
       }
       case 'removed_items': {
+        // Logically can't fire on a first run (nothing to remove from).
         if (isFirstRun) break;
         if (diff.removed.length > 0) {
           out.push({
