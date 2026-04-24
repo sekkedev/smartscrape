@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { TopNav } from '../components/layout/TopNav';
+import { RunDiff } from '../components/RunDiff';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
@@ -14,6 +15,7 @@ export default function JobDetail() {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [runningNow, setRunningNow] = useState(false);
+  const [openDiff, setOpenDiff] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [jr, rr] = await Promise.all([
@@ -148,25 +150,47 @@ export default function JobDetail() {
                   <th className="py-2">Tokens</th>
                   <th className="py-2">Duration</th>
                   <th className="py-2">When</th>
+                  <th className="py-2"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                 {runs.map((r) => (
-                  <tr key={r.id}>
-                    <td className="py-2">
-                      <StatusBadge status={r.status} />
-                    </td>
-                    <td className="py-2 font-mono text-xs">{r.items_extracted}</td>
-                    <td className="py-2 font-mono text-xs">{r.tokens_used}</td>
-                    <td className="py-2 font-mono text-xs">
-                      {r.completed_at
-                        ? `${Math.round(
-                            (new Date(r.completed_at).getTime() - new Date(r.started_at).getTime()) / 100,
-                          ) / 10}s`
-                        : '—'}
-                    </td>
-                    <td className="py-2 font-mono text-xs text-gray-500">{new Date(r.started_at).toLocaleString()}</td>
-                  </tr>
+                  <Fragment key={r.id}>
+                    <tr>
+                      <td className="py-2">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="py-2 font-mono text-xs">{r.items_extracted}</td>
+                      <td className="py-2 font-mono text-xs">{r.tokens_used}</td>
+                      <td className="py-2 font-mono text-xs">
+                        {r.completed_at
+                          ? `${Math.round(
+                              (new Date(r.completed_at).getTime() - new Date(r.started_at).getTime()) / 100,
+                            ) / 10}s`
+                          : '—'}
+                      </td>
+                      <td className="py-2 font-mono text-xs text-gray-500">
+                        {new Date(r.started_at).toLocaleString()}
+                      </td>
+                      <td className="py-2 text-right">
+                        {r.status === 'completed' && (
+                          <button
+                            onClick={() => setOpenDiff(openDiff === r.id ? null : r.id)}
+                            className="text-xs text-indigo-600 hover:underline dark:text-indigo-400"
+                          >
+                            {openDiff === r.id ? 'Hide diff' : 'Diff'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                    {openDiff === r.id && (
+                      <tr>
+                        <td colSpan={6} className="bg-gray-50 px-2 py-3 dark:bg-gray-950/40">
+                          <RunDiff runId={r.id} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

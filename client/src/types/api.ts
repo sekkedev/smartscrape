@@ -119,6 +119,22 @@ export type ExtractedData = {
   created_at: string;
 };
 
+export type FieldDiff = { field: string; old: unknown; new: unknown };
+
+export type DiffResult = {
+  current_run: { id: string; started_at: string };
+  previous_run: { id: string; started_at: string } | null;
+  added: Record<string, unknown>[];
+  removed: Record<string, unknown>[];
+  changed: {
+    key: string | null;
+    before: Record<string, unknown>;
+    after: Record<string, unknown>;
+    field_diffs: FieldDiff[];
+  }[];
+  comparison_key: string | null;
+};
+
 export type HealthStatus = {
   status: 'healthy' | 'degraded';
   checks: {
