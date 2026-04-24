@@ -26,9 +26,19 @@ export async function testCredentials(provider: Provider, apiKey: string): Promi
       const client = new Anthropic({ apiKey });
       await client.models.list({ limit: 1 });
     } else {
-      // OpenRouter implements the OpenAI spec.
-      const client = new OpenAI({ apiKey, baseURL: OPENROUTER_BASE_URL });
-      await client.models.list();
+      // OpenRouter's /v1/models is a PUBLIC endpoint — it returns results for
+      // any Authorization header, so we can't use it to validate the key.
+      // /v1/auth/key returns the key's label/usage and requires a valid key.
+      const res = await fetch(`${OPENROUTER_BASE_URL}/auth/key`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) {
+        return {
+          ok: false,
+          latencyMs: Date.now() - started,
+          error: res.status === 401 || res.status === 403 ? 'Invalid API key' : `${res.status}: ${res.statusText}`,
+        };
+      }
     }
     return { ok: true, latencyMs: Date.now() - started };
   } catch (err) {

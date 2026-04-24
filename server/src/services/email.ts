@@ -8,6 +8,12 @@ type SendArgs = {
   html?: string;
 };
 
+export type SendResult =
+  /** Delivered to SMTP. */
+  | { delivered: true }
+  /** No SMTP configured; message was written to the server log instead. */
+  | { delivered: false; reason: 'smtp_not_configured' };
+
 let cached: Transporter | null = null;
 
 function transporter(): Transporter | null {
@@ -25,12 +31,17 @@ function transporter(): Transporter | null {
   return cached;
 }
 
+export function isSmtpConfigured(): boolean {
+  return Boolean(env.smtp.host);
+}
+
 /**
  * Send an email via SMTP when configured; otherwise log it. The console
  * fallback keeps dev flows (verify email, password reset) working without
- * forcing SMTP setup.
+ * forcing SMTP setup. Returns a discriminant so callers (e.g. the test-email
+ * route) can tell the user their message went to the log, not an inbox.
  */
-export async function sendEmail({ to, subject, text, html }: SendArgs): Promise<void> {
+export async function sendEmail({ to, subject, text, html }: SendArgs): Promise<SendResult> {
   const tx = transporter();
   if (!tx) {
     console.log('[email:dev-console]', {
@@ -39,7 +50,8 @@ export async function sendEmail({ to, subject, text, html }: SendArgs): Promise<
       subject,
       text,
     });
-    return;
+    return { delivered: false, reason: 'smtp_not_configured' };
   }
   await tx.sendMail({ from: env.smtp.from, to, subject, text, html });
+  return { delivered: true };
 }
