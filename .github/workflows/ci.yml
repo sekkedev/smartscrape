@@ -18,3 +18,38 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: smartscrape
+          POSTGRES_PASSWORD: smartscrape
+          POSTGRES_DB: smartscrape
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U smartscrape -d smartscrape"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://smartscrape:smartscrape@localhost:5432/smartscrape
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run migrations up
+        run: npm run migrate:up --workspace server
+      - name: Migrations down (reverse each migration)
+        run: |
+          for _ in 1 2 3 4; do
+            npm run migrate:down --workspace server
+          done
+      - name: Re-apply migrations
+        run: npm run migrate:up --workspace server
