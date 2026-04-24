@@ -2,8 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Let the document grow with content so long forms (e.g. the New Job wizard
+   with an expanded rule editor) don't clip the submit button and block scroll.
+   The old rule was `height: 100%`, which pins #root to exactly one viewport
+   and leaves tall pages un-scrollable. */
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
