@@ -4,7 +4,7 @@ import { TopNav } from '../components/layout/TopNav';
 import { RunDiff } from '../components/RunDiff';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
-import { api } from '../lib/api';
+import { api, downloadBlob } from '../lib/api';
 import type { Job, Run, RunStatus } from '../types/api';
 
 export default function JobDetail() {
@@ -174,12 +174,22 @@ export default function JobDetail() {
                       </td>
                       <td className="py-2 text-right">
                         {r.status === 'completed' && (
-                          <button
-                            onClick={() => setOpenDiff(openDiff === r.id ? null : r.id)}
-                            className="text-xs text-indigo-600 hover:underline dark:text-indigo-400"
-                          >
-                            {openDiff === r.id ? 'Hide diff' : 'Diff'}
-                          </button>
+                          <div className="flex justify-end gap-3">
+                            <button
+                              onClick={() =>
+                                void downloadBlob(`/api/jobs/${id}/export/csv/${r.id}`, `run-${r.id.slice(0, 8)}.csv`)
+                              }
+                              className="text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                            >
+                              CSV
+                            </button>
+                            <button
+                              onClick={() => setOpenDiff(openDiff === r.id ? null : r.id)}
+                              className="text-xs text-indigo-600 hover:underline dark:text-indigo-400"
+                            >
+                              {openDiff === r.id ? 'Hide diff' : 'Diff'}
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

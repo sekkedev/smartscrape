@@ -13,7 +13,8 @@ import {
   toggleJob,
   updateJob,
 } from '../db/jobs.js';
-import { listRunsForJob } from '../db/runs.js';
+import { listDataForRun, listRunsForJob } from '../db/runs.js';
+import { toCsv } from '../lib/csv.js';
 import { findForUser as findApiKey, type Provider as ProviderName } from '../db/apiKeys.js';
 import { decrypt } from '../config/encryption.js';
 import { scrape } from '../services/scraper.js';
@@ -317,6 +318,52 @@ jobsRouter.post('/:id/run', validate(idParam, 'params'), async (req, res) => {
   const run = await createRun(job.id);
   await enqueueNow({ jobId: job.id, userId: job.user_id, runId: run.id });
   res.status(202).json(ok({ run: toRunDTO(run) }));
+});
+
+async function sendCsvForRun(res: import('express').Response, jobId: string, runId: string, userId: string, jobName: string): Promise<void> {
+  const rows = await listDataForRun(userId, runId);
+  const csv = toCsv(rows.map((r) => ({ source_url: r.source_url, extracted_at: r.created_at, ...r.data })));
+  const safeName = jobName.replace(/[^a-z0-9_-]+/gi, '_').slice(0, 60) || 'export';
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${safeName}-${runId.slice(0, 8)}.csv"`,
+  );
+  res.status(200).send(csv);
+  void jobId;
+}
+
+jobsRouter.get('/:id/export/csv', validate(idParam, 'params'), async (req, res) => {
+  const { id } = req.params as unknown as z.infer<typeof idParam>;
+  const job = await findJob(req.user!.id, id);
+  if (!job) {
+    res.status(404).json(fail('NOT_FOUND', 'Job not found'));
+    return;
+  }
+  const runs = await listRunsForJob(req.user!.id, id, 1, 0);
+  const latest = runs.find((r) => r.status === 'completed') ?? runs[0];
+  if (!latest) {
+    res.status(404).json(fail('NO_RUNS', 'No runs yet'));
+    return;
+  }
+  await sendCsvForRun(res, id, latest.id, req.user!.id, job.name);
+});
+
+jobsRouter.get('/:id/export/csv/:runId', async (req, res) => {
+  const parsed = z
+    .object({ id: z.string().uuid(), runId: z.string().uuid() })
+    .safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json(fail('VALIDATION_ERROR', 'Invalid params'));
+    return;
+  }
+  const { id, runId } = parsed.data;
+  const job = await findJob(req.user!.id, id);
+  if (!job) {
+    res.status(404).json(fail('NOT_FOUND', 'Job not found'));
+    return;
+  }
+  await sendCsvForRun(res, id, runId, req.user!.id, job.name);
 });
 
 jobsRouter.get('/:id/runs', validate(idParam, 'params'), async (req, res) => {
