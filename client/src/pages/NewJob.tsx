@@ -79,6 +79,8 @@ export default function NewJob() {
       notify_channels: [],
       ai_provider: provider,
       ai_model: model,
+      google_sheet_id: null,
+      sheet_tab_name: null,
     });
     setStep('review');
   }
