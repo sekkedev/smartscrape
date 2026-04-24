@@ -7,6 +7,7 @@ export type GoogleConnectionRow = {
   refresh_token_encrypted: string;
   token_expires_at: Date | null;
   connected_email: string | null;
+  scope: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -25,16 +26,18 @@ export async function upsertConnection(args: {
   refreshTokenEncrypted: string;
   tokenExpiresAt: Date | null;
   connectedEmail: string | null;
+  scope: string | null;
 }): Promise<GoogleConnectionRow> {
   const { rows } = await getPool().query<GoogleConnectionRow>(
     `INSERT INTO google_connections
-       (user_id, access_token_encrypted, refresh_token_encrypted, token_expires_at, connected_email)
-     VALUES ($1, $2, $3, $4, $5)
+       (user_id, access_token_encrypted, refresh_token_encrypted, token_expires_at, connected_email, scope)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (user_id)
        DO UPDATE SET access_token_encrypted = EXCLUDED.access_token_encrypted,
                      refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
                      token_expires_at = EXCLUDED.token_expires_at,
-                     connected_email = EXCLUDED.connected_email
+                     connected_email = EXCLUDED.connected_email,
+                     scope = EXCLUDED.scope
      RETURNING *`,
     [
       args.userId,
@@ -42,6 +45,7 @@ export async function upsertConnection(args: {
       args.refreshTokenEncrypted,
       args.tokenExpiresAt,
       args.connectedEmail,
+      args.scope,
     ],
   );
   return rows[0]!;

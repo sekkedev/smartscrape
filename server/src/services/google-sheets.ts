@@ -8,11 +8,14 @@ import {
   upsertConnection,
 } from '../db/googleConnections.js';
 
+export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
+
 // Minimal scopes: write sheets + read user's email to display which account is connected.
-export const SHEETS_SCOPES = [
-  'https://www.googleapis.com/auth/spreadsheets',
-  'https://www.googleapis.com/auth/userinfo.email',
-];
+export const SHEETS_SCOPES = [SHEETS_SCOPE, USERINFO_EMAIL_SCOPE];
+
+const RECONNECT_HINT =
+  'Disconnect Google in Settings and reconnect to grant the Sheets permission.';
 
 function clientConfig() {
   const id = process.env.GOOGLE_CLIENT_ID ?? '';
@@ -68,6 +71,16 @@ export async function exchangeAndStore(userId: string, code: string): Promise<{ 
   const client = oauthClient();
   const { tokens } = await client.getToken(code);
   if (!tokens.access_token) throw new Error('Google did not return an access token');
+
+  const grantedScope = typeof tokens.scope === 'string' ? tokens.scope : '';
+  const scopes = new Set(grantedScope.split(/\s+/).filter(Boolean));
+  if (!scopes.has(SHEETS_SCOPE)) {
+    throw new Error(
+      `Google did not grant the Sheets scope (${SHEETS_SCOPE}). Granted: ${grantedScope || '(none)'}. ` +
+        `Check the OAuth consent screen in the Google Cloud project and ensure spreadsheets is listed, then try again.`,
+    );
+  }
+
   if (!tokens.refresh_token) {
     // On re-auth Google omits refresh_token. If we already have one stored, reuse it.
     const existing = await findConnection(userId);
@@ -89,6 +102,7 @@ export async function exchangeAndStore(userId: string, code: string): Promise<{ 
     refreshTokenEncrypted: encrypt(tokens.refresh_token),
     tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
     connectedEmail: email,
+    scope: grantedScope,
   });
 
   return { email };
@@ -137,6 +151,14 @@ export async function pushRows(args: {
   rows: Record<string, unknown>[];
 }): Promise<{ appended: number }> {
   if (args.rows.length === 0) return { appended: 0 };
+  // Fail fast with an actionable message when the stored scope is missing the
+  // write permission. Otherwise the Sheets API returns an opaque 403.
+  const conn = await findConnection(args.userId);
+  if (conn && conn.scope !== null && !conn.scope.split(/\s+/).includes(SHEETS_SCOPE)) {
+    throw new Error(
+      `Stored Google credentials are missing the Sheets scope. ${RECONNECT_HINT}`,
+    );
+  }
   const client = await authedClient(args.userId);
   const sheets = google.sheets({ version: 'v4', auth: client });
   const tab = args.tabName && args.tabName.length > 0 ? args.tabName : 'Sheet1';
