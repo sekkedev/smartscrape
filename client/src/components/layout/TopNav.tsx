@@ -10,19 +10,19 @@ export function TopNav() {
 
   return (
     <header className="border-b border-gray-200 bg-white/70 backdrop-blur dark:border-gray-800 dark:bg-gray-950/70">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-6">
-          <Link to="/" className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-6">
+          <Link to="/" className="shrink-0 text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
             SmartScrape
           </Link>
-          <nav className="flex items-center gap-1 overflow-x-auto">
+          <nav className="flex min-w-0 items-center gap-1 overflow-x-auto">
             <NavItem to="/">Home</NavItem>
             <NavItem to="/jobs">Jobs</NavItem>
             <NavItem to="/notifications">Notifications</NavItem>
             <NavItem to="/settings">Settings</NavItem>
           </nav>
         </div>
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={() => setOpen((v) => !v)}
             className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
