@@ -4,6 +4,10 @@ import ForgotPassword from './pages/ForgotPassword';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import EditJob from './pages/EditJob';
+import JobDetail from './pages/JobDetail';
+import Jobs from './pages/Jobs';
+import NewJob from './pages/NewJob';
 import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
 import VerifyEmail from './pages/VerifyEmail';
@@ -37,6 +41,38 @@ export default function App() {
           element={
             <RequireAuth>
               <Home />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/jobs"
+          element={
+            <RequireAuth>
+              <Jobs />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/jobs/new"
+          element={
+            <RequireAuth>
+              <NewJob />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/jobs/:id"
+          element={
+            <RequireAuth>
+              <JobDetail />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/jobs/:id/edit"
+          element={
+            <RequireAuth>
+              <EditJob />
             </RequireAuth>
           }
         />
