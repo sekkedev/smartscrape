@@ -1,4 +1,6 @@
 import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
 import { env, requireSecrets } from './config/env.js';
 import { closeDatabase } from './config/database.js';
 import { closeRedis } from './config/redis.js';
@@ -12,6 +14,7 @@ import { jobsRouter } from './routes/jobs.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { providersRouter } from './routes/providers.js';
 import { runsRouter } from './routes/runs.js';
+import { settingsRouter } from './routes/settings.js';
 import { generalLimiter } from './middleware/rateLimit.js';
 import { fail } from './lib/response.js';
 
@@ -21,6 +24,24 @@ requireSecrets();
 const app = express();
 
 app.set('trust proxy', 1);
+
+// Helmet sets defensive HTTP headers (CSP off — the API serves JSON only,
+// the SPA is hosted separately by Vite/static and brings its own CSP).
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+// CORS is locked to APP_URL. Server-to-server callers (no Origin header) and
+// the Google OAuth redirect (same-origin to API) are allowed through.
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (origin === env.appUrl) return cb(null, true);
+      return cb(new Error(`CORS: origin not allowed: ${origin}`));
+    },
+    credentials: true,
+  }),
+);
+
 app.use(express.json({ limit: '1mb' }));
 
 // Health stays outside the rate limiter so uptime probes never 429.
@@ -34,6 +55,7 @@ app.use('/api/runs', runsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/google', googleRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/settings', settingsRouter);
 
 app.use((_req, res) => {
   res.status(404).json(fail('NOT_FOUND', 'Route not found'));

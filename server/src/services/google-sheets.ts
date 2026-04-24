@@ -9,10 +9,12 @@ import {
 } from '../db/googleConnections.js';
 
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+export const DRIVE_METADATA_SCOPE = 'https://www.googleapis.com/auth/drive.metadata.readonly';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
 
-// Minimal scopes: write sheets + read user's email to display which account is connected.
-export const SHEETS_SCOPES = [SHEETS_SCOPE, USERINFO_EMAIL_SCOPE];
+// write sheets + read drive metadata (so we can list the user's spreadsheets in the picker)
+// + read the user's email to display which account is connected.
+export const SHEETS_SCOPES = [SHEETS_SCOPE, DRIVE_METADATA_SCOPE, USERINFO_EMAIL_SCOPE];
 
 const RECONNECT_HINT =
   'Disconnect Google in Settings and reconnect to grant the Sheets permission.';
@@ -195,6 +197,47 @@ export async function pushRows(args: {
   });
 
   return { appended: args.rows.length };
+}
+
+export type SheetSummary = {
+  id: string;
+  name: string;
+  modifiedTime: string | null;
+  webViewLink: string | null;
+};
+
+/**
+ * List the user's Google Sheets via Drive API. Requires the `drive.metadata.readonly`
+ * scope. If the stored connection lacks it, throws a clear reconnect error so the UI
+ * can surface a "reconnect Google" CTA instead of an opaque 403.
+ */
+export async function listSheets(userId: string, query?: string): Promise<SheetSummary[]> {
+  const conn = await findConnection(userId);
+  if (!conn) throw new Error('No Google connection');
+  if (conn.scope !== null && !conn.scope.split(/\s+/).includes(DRIVE_METADATA_SCOPE)) {
+    throw new Error(
+      `Stored Google credentials are missing the Drive metadata scope. ${RECONNECT_HINT}`,
+    );
+  }
+  const client = await authedClient(userId);
+  const drive = google.drive({ version: 'v3', auth: client });
+  const q = ["mimeType = 'application/vnd.google-apps.spreadsheet'", 'trashed = false'];
+  if (query && query.trim().length > 0) {
+    // escape single quotes for the Drive query string
+    q.push(`name contains '${query.replace(/'/g, "\\'")}'`);
+  }
+  const { data } = await drive.files.list({
+    q: q.join(' and '),
+    pageSize: 50,
+    orderBy: 'modifiedTime desc',
+    fields: 'files(id, name, modifiedTime, webViewLink)',
+  });
+  return (data.files ?? []).map((f) => ({
+    id: f.id ?? '',
+    name: f.name ?? '(untitled)',
+    modifiedTime: f.modifiedTime ?? null,
+    webViewLink: f.webViewLink ?? null,
+  }));
 }
 
 export async function revokeConnection(userId: string): Promise<void> {

@@ -3,13 +3,16 @@ import { env } from '../config/env.js';
 import { deleteConnection, findConnection } from '../db/googleConnections.js';
 import { fail, ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
+import { z } from 'zod';
 import {
   buildAuthUrl,
   exchangeAndStore,
   isConfigured,
+  listSheets,
   revokeConnection,
   verifyState,
 } from '../services/google-sheets.js';
+import { validate } from '../middleware/validate.js';
 
 export const googleRouter = Router();
 
@@ -75,3 +78,26 @@ googleRouter.delete('/disconnect', requireAuth, async (req, res) => {
   await deleteConnection(req.user!.id);
   res.status(200).json(ok({ disconnected: true }));
 });
+
+const sheetsListQuery = z.object({ q: z.string().max(200).optional() });
+
+googleRouter.get(
+  '/sheets',
+  requireAuth,
+  validate(sheetsListQuery, 'query'),
+  async (req, res) => {
+    const conn = await findConnection(req.user!.id);
+    if (!conn) {
+      res.status(400).json(fail('NOT_CONNECTED', 'Google is not connected'));
+      return;
+    }
+    try {
+      const q = (req.query as { q?: string }).q;
+      const sheets = await listSheets(req.user!.id, q);
+      res.status(200).json(ok({ sheets }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to list sheets';
+      res.status(502).json(fail('SHEETS_LIST_FAILED', message));
+    }
+  },
+);

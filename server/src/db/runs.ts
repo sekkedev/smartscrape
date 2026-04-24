@@ -64,6 +64,18 @@ export async function findRun(userId: string, runId: string): Promise<RunRow | n
   return rows[0] ?? null;
 }
 
+/** Count runs for a user in the last 24h (rolling window). Used for the daily quota. */
+export async function countRunsLast24h(userId: string): Promise<number> {
+  const { rows } = await getPool().query<{ count: string }>(
+    `SELECT count(*)::text AS count
+       FROM scrape_runs r
+       JOIN scrape_jobs j ON j.id = r.job_id
+      WHERE j.user_id = $1 AND r.started_at > now() - interval '24 hours'`,
+    [userId],
+  );
+  return Number.parseInt(rows[0]?.count ?? '0', 10);
+}
+
 export async function createRun(jobId: string): Promise<RunRow> {
   const { rows } = await getPool().query<RunRow>(
     `INSERT INTO scrape_runs (job_id, status) VALUES ($1, 'pending') RETURNING *`,

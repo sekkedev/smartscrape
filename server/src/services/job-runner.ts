@@ -1,14 +1,15 @@
 import { getPool } from '../config/database.js';
 import { decrypt } from '../config/encryption.js';
-import { findForUser as findApiKey } from '../db/apiKeys.js';
+import { findForUser as findApiKey, PROVIDERS } from '../db/apiKeys.js';
 import type { JobRow } from '../db/jobs.js';
-import { createRun, insertExtractedData, updateRun } from '../db/runs.js';
+import { countRunsLast24h, createRun, insertExtractedData, updateRun } from '../db/runs.js';
 import { extract, hashItem } from './ai-extractor.js';
 import { scrape } from './scraper.js';
 import { diffRun } from './change-detector.js';
 import { dispatch, evaluateRules } from './notification-service.js';
 import { pushRows } from './google-sheets.js';
 import { findConnection } from '../db/googleConnections.js';
+import { findUserById } from '../db/users.js';
 
 export type RunSummary = {
   runId: string;
@@ -25,10 +26,23 @@ export type RunSummary = {
  *   - for each URL: scrape \u2192 extract \u2192 hash \u2192 insert extracted_data
  *   - update the run row with final status + counters
  */
+export const DAILY_RUN_QUOTA = 100;
+
 export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSummary> {
   const run = existingRunId
     ? { id: existingRunId, job_id: job.id }
     : await createRun(job.id);
+
+  // Daily run quota: cap total runs per user per rolling 24h to prevent runaway
+  // schedules. Manual triggers also pre-check at the route, but enforcing here
+  // covers scheduled runs and races between simultaneous triggers.
+  // We subtract 1 because the row above is already counted.
+  const recent = await countRunsLast24h(job.user_id);
+  if (recent - 1 >= DAILY_RUN_QUOTA) {
+    const err = `Daily run quota reached (${DAILY_RUN_QUOTA}/24h). Run skipped.`;
+    await updateRun(run.id, { status: 'failed', error_message: err, completed_at: new Date() });
+    return { runId: run.id, jobId: job.id, status: 'failed', itemsExtracted: 0, tokensUsed: 0, error: err };
+  }
 
   const provider = job.ai_provider;
   const keyRow = await findApiKey(job.user_id, provider);
@@ -44,6 +58,22 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
     const err = 'Stored provider key could not be decrypted';
     await updateRun(run.id, { status: 'failed', error_message: err, completed_at: new Date() });
     return { runId: run.id, jobId: job.id, status: 'failed', itemsExtracted: 0, tokensUsed: 0, error: err };
+  }
+
+  // Build the secret guard list once per run: any value that surfacing in AI
+  // output would suggest a prompt-injection compromise. Includes the user's
+  // email and every stored provider key, regardless of which one is used.
+  const secretGuards: string[] = [];
+  const user = await findUserById(job.user_id);
+  if (user?.email) secretGuards.push(user.email);
+  for (const p of PROVIDERS) {
+    const row = await findApiKey(job.user_id, p);
+    if (!row) continue;
+    try {
+      secretGuards.push(decrypt(row.api_key_encrypted));
+    } catch {
+      // ignore — un-decryptable keys can't leak
+    }
   }
 
   await updateRun(run.id, { status: 'scraping' });
@@ -67,6 +97,7 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
         cleanedHtml: page.cleaned,
         extractionPrompt: job.extraction_prompt,
         extractionSchema: job.extraction_schema ?? undefined,
+        secretGuards,
       });
 
       if (!result.ok) {
