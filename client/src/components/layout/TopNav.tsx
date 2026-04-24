@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../../stores/auth';
 
 export function TopNav() {
@@ -10,9 +10,15 @@ export function TopNav() {
   return (
     <header className="border-b border-gray-200 bg-white/70 backdrop-blur dark:border-gray-800 dark:bg-gray-950/70">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-        <Link to="/" className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-          SmartScrape
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link to="/" className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+            SmartScrape
+          </Link>
+          <nav className="hidden items-center gap-1 sm:flex">
+            <NavItem to="/">Home</NavItem>
+            <NavItem to="/settings">Settings</NavItem>
+          </nav>
+        </div>
         <div className="relative">
           <button
             onClick={() => setOpen((v) => !v)}
@@ -48,5 +54,23 @@ export function TopNav() {
         </div>
       </div>
     </header>
+  );
+}
+
+function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      end={to === '/'}
+      className={({ isActive }) =>
+        `rounded-md px-2.5 py-1.5 text-sm transition ${
+          isActive
+            ? 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
+            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+        }`
+      }
+    >
+      {children}
+    </NavLink>
   );
 }
