@@ -14,6 +14,12 @@ import {
   updateJob,
 } from '../db/jobs.js';
 import { listRunsForJob } from '../db/runs.js';
+import { findForUser as findApiKey, type Provider as ProviderName } from '../db/apiKeys.js';
+import { decrypt } from '../config/encryption.js';
+import { scrape } from '../services/scraper.js';
+import { suggest } from '../services/ai-setup.js';
+import { extract } from '../services/ai-extractor.js';
+import { getPool } from '../config/database.js';
 
 export const jobsRouter = Router();
 jobsRouter.use(requireAuth);
@@ -91,6 +97,136 @@ async function validateAllUrls(urls: string[]): Promise<string | null> {
 }
 
 // ---------- routes ----------
+
+const aiSetupBody = z.object({
+  url: z.string().url(),
+  goal: z.string().trim().min(3).max(2000),
+  ai_provider: providerEnum.optional(),
+  ai_model: z.string().min(1).max(120).optional(),
+});
+
+const aiPreviewBody = z.object({
+  url: z.string().url(),
+  extraction_prompt: z.string().trim().min(3).max(5000),
+  extraction_schema: extractionSchema.nullable().optional(),
+  ai_provider: providerEnum.optional(),
+  ai_model: z.string().min(1).max(120).optional(),
+});
+
+const aiConfirmBody = createBody.extend({
+  user_goal: z.string().trim().min(1).max(2000),
+  ai_suggestion: z.record(z.unknown()),
+});
+
+async function resolveProviderKey(
+  userId: string,
+  provider: ProviderName,
+): Promise<{ ok: true; key: string } | { ok: false; status: number; code: string; message: string }> {
+  const row = await findApiKey(userId, provider);
+  if (!row) {
+    return { ok: false, status: 400, code: 'NO_PROVIDER_KEY', message: `No ${provider} key configured. Add one in Settings.` };
+  }
+  try {
+    return { ok: true, key: decrypt(row.api_key_encrypted) };
+  } catch {
+    return { ok: false, status: 500, code: 'DECRYPT_FAILED', message: 'Stored key could not be decrypted' };
+  }
+}
+
+jobsRouter.post('/ai-setup', validate(aiSetupBody), async (req, res) => {
+  const body = req.body as z.infer<typeof aiSetupBody>;
+  const safety = await assertSafeUrl(body.url);
+  if (!safety.ok) {
+    res.status(400).json(fail('UNSAFE_URL', safety.reason));
+    return;
+  }
+  const provider = body.ai_provider ?? 'openrouter';
+  const keyRes = await resolveProviderKey(req.user!.id, provider);
+  if (!keyRes.ok) {
+    res.status(keyRes.status).json(fail(keyRes.code, keyRes.message));
+    return;
+  }
+  let page;
+  try {
+    page = await scrape(body.url);
+  } catch (err) {
+    res.status(502).json(fail('SCRAPE_FAILED', err instanceof Error ? err.message : 'Scrape failed'));
+    return;
+  }
+  const result = await suggest({
+    provider,
+    apiKey: keyRes.key,
+    model: body.ai_model ?? 'openai/gpt-4o-mini',
+    cleanedHtml: page.cleaned,
+    userGoal: body.goal,
+  });
+  if (!result.ok) {
+    res.status(502).json(fail('AI_SETUP_FAILED', result.error));
+    return;
+  }
+  res.status(200).json(
+    ok({
+      suggestion: result.suggestion,
+      usage: result.usage,
+      scrape: { method: page.method, status: page.status, finalUrl: page.finalUrl, durationMs: page.durationMs },
+    }),
+  );
+});
+
+jobsRouter.post('/ai-setup/preview', validate(aiPreviewBody), async (req, res) => {
+  const body = req.body as z.infer<typeof aiPreviewBody>;
+  const safety = await assertSafeUrl(body.url);
+  if (!safety.ok) {
+    res.status(400).json(fail('UNSAFE_URL', safety.reason));
+    return;
+  }
+  const provider = body.ai_provider ?? 'openrouter';
+  const keyRes = await resolveProviderKey(req.user!.id, provider);
+  if (!keyRes.ok) {
+    res.status(keyRes.status).json(fail(keyRes.code, keyRes.message));
+    return;
+  }
+  let page;
+  try {
+    page = await scrape(body.url);
+  } catch (err) {
+    res.status(502).json(fail('SCRAPE_FAILED', err instanceof Error ? err.message : 'Scrape failed'));
+    return;
+  }
+  const result = await extract({
+    provider,
+    apiKey: keyRes.key,
+    model: body.ai_model ?? 'openai/gpt-4o-mini',
+    cleanedHtml: page.cleaned,
+    extractionPrompt: body.extraction_prompt,
+    extractionSchema: body.extraction_schema ?? undefined,
+  });
+  if (!result.ok) {
+    res.status(502).json(fail('EXTRACT_FAILED', result.error));
+    return;
+  }
+  res.status(200).json(ok({ items: result.items.slice(0, 20), usage: result.usage }));
+});
+
+jobsRouter.post('/ai-setup/confirm', validate(aiConfirmBody), async (req, res) => {
+  const body = req.body as z.infer<typeof aiConfirmBody>;
+  const bad = await validateAllUrls(body.urls);
+  if (bad) {
+    res.status(400).json(fail('UNSAFE_URL', bad));
+    return;
+  }
+  const { user_goal, ai_suggestion, ...jobArgs } = body;
+  const job = await createJob(req.user!.id, {
+    ...jobArgs,
+    extraction_schema: jobArgs.extraction_schema ?? null,
+    setup_method: 'ai',
+  });
+  await getPool().query(
+    `INSERT INTO job_setup_logs (job_id, user_goal, ai_suggestion, accepted) VALUES ($1, $2, $3::jsonb, true)`,
+    [job.id, user_goal, JSON.stringify(ai_suggestion)],
+  );
+  res.status(201).json(ok({ job: toJobDTO(job) }));
+});
 
 jobsRouter.get('/', validate(listQuery, 'query'), async (req, res) => {
   const q = req.query as unknown as z.infer<typeof listQuery>;
