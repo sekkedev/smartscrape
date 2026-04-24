@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { RedirectIfAuthed, RequireAuth } from './components/RequireAuth';
+import { Toaster } from './components/Toaster';
 import ForgotPassword from './pages/ForgotPassword';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -16,6 +17,7 @@ import VerifyEmail from './pages/VerifyEmail';
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster />
       <Routes>
         <Route
           path="/login"
