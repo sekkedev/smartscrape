@@ -23,7 +23,7 @@ if (envPath) {
 
 function required(name: string): string {
   const value = process.env[name];
-  if (!value) {
+  if (!value || value.startsWith('replace-me')) {
     throw new Error(`Missing required env var: ${name}`);
   }
   return value;
@@ -39,11 +39,41 @@ export const env = {
   databaseUrl: optional('DATABASE_URL'),
   redisUrl: optional('REDIS_URL'),
   appUrl: optional('APP_URL', 'http://localhost:5173'),
+  apiUrl: optional('API_URL', 'http://localhost:3000'),
+  smtp: {
+    host: optional('SMTP_HOST'),
+    port: Number.parseInt(optional('SMTP_PORT', '587'), 10),
+    user: optional('SMTP_USER'),
+    pass: optional('SMTP_PASS'),
+    from: optional('EMAIL_FROM', 'noreply@smartscrape.local'),
+  },
+  resend: {
+    apiKey: optional('RESEND_API_KEY'),
+  },
 };
 
-export function requireSecrets(): void {
-  // Called from places that need them; the health check route stays tolerant.
-  required('JWT_SECRET');
-  required('JWT_REFRESH_SECRET');
-  required('ENCRYPTION_KEY');
+type Secrets = {
+  jwtAccessSecret: string;
+  jwtRefreshSecret: string;
+  encryptionKey: string;
+};
+
+let cachedSecrets: Secrets | null = null;
+
+/**
+ * Read and validate all runtime secrets. Throws if any are missing or still
+ * placeholder values. Cache so subsequent calls are free.
+ */
+export function requireSecrets(): Secrets {
+  if (cachedSecrets) return cachedSecrets;
+  const encryptionKeyHex = required('ENCRYPTION_KEY');
+  if (!/^[0-9a-fA-F]{64}$/.test(encryptionKeyHex)) {
+    throw new Error('ENCRYPTION_KEY must be 32 bytes hex-encoded (64 hex chars)');
+  }
+  cachedSecrets = {
+    jwtAccessSecret: required('JWT_SECRET'),
+    jwtRefreshSecret: required('JWT_REFRESH_SECRET'),
+    encryptionKey: encryptionKeyHex,
+  };
+  return cachedSecrets;
 }
