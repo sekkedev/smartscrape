@@ -77,11 +77,14 @@ export function cleanHtml(html: string, opts: CleanOptions = {}): string {
     }
   });
 
-  // Prefer <main> / <article> if present.
+  // Prefer <main> when present (usually one per page, wraps real content).
+  // Never collapse to a single <article>: listing pages often have one
+  // <article> per item (product cards, search results, posts), and grabbing
+  // the first would silently drop the rest. If there's no <main>, use body.
   let workingHtml: string;
-  const main = $('main, article').first();
-  if (main.length > 0) {
-    workingHtml = $.html(main);
+  const mains = $('main');
+  if (mains.length > 0) {
+    workingHtml = mains.map((_, el) => $.html(el)).get().join('\n');
   } else {
     workingHtml = $('body').length ? $.html($('body')) : $.html();
   }
