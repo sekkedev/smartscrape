@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { TopNav } from '../components/layout/TopNav';
 import { ProviderCard } from '../components/ProviderCard';
+import { TelegramCard } from '../components/TelegramCard';
 import { api } from '../lib/api';
 import type { Provider, ProviderSummary } from '../types/api';
 
@@ -103,11 +104,16 @@ export default function Settings() {
         </section>
 
         <section className="mt-12 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-            Coming soon
-          </h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Notifications</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            <TelegramCard />
+          </div>
+        </section>
+
+        <section className="mt-12 space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Coming soon</h2>
           <div className="rounded-lg border border-dashed border-gray-300 bg-white/40 p-6 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-            Profile, Google Sheets, Telegram, Email, and account deletion land in upcoming releases.
+            Profile, Google Sheets, and account deletion land in upcoming releases.
           </div>
         </section>
       </main>
