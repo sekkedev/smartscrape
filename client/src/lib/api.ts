@@ -80,6 +80,33 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<A
   }
 }
 
+/**
+ * Download a blob from an authenticated endpoint by issuing a fetch with the Bearer
+ * header, then triggering a saveAs. Used for CSV export because anchor downloads
+ * can't carry an Authorization header.
+ */
+export async function downloadBlob(path: string, suggestedName: string): Promise<boolean> {
+  let res = await doFetch(path, {});
+  if (res.status === 401) {
+    const refreshed = await refreshSession();
+    if (refreshed) res = await doFetch(path, {});
+  }
+  if (!res.ok) return false;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  // Prefer the server's filename if it set one.
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  a.download = match?.[1] ?? suggestedName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
 /** Convenience: throws if the envelope reports failure. Use when you don't need to branch on the error. */
 export async function apiOrThrow<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const result = await api<T>(path, opts);
