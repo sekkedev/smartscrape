@@ -119,6 +119,18 @@ export type ExtractedData = {
   created_at: string;
 };
 
+export type NotificationItem = {
+  id: string;
+  user_id: string;
+  job_id: string;
+  run_id: string;
+  channel: 'email' | 'telegram';
+  type: 'change_detected' | 'job_failed' | 'job_completed';
+  message: string | null;
+  sent_at: string;
+  job_name?: string;
+};
+
 export type FieldDiff = { field: string; old: unknown; new: unknown };
 
 export type DiffResult = {

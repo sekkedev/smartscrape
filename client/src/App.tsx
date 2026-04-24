@@ -8,6 +8,7 @@ import EditJob from './pages/EditJob';
 import JobDetail from './pages/JobDetail';
 import Jobs from './pages/Jobs';
 import NewJob from './pages/NewJob';
+import Notifications from './pages/Notifications';
 import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
 import VerifyEmail from './pages/VerifyEmail';
@@ -73,6 +74,14 @@ export default function App() {
           element={
             <RequireAuth>
               <EditJob />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <RequireAuth>
+              <Notifications />
             </RequireAuth>
           }
         />
