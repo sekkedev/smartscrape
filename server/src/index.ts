@@ -4,6 +4,7 @@ import { closeDatabase } from './config/database.js';
 import { closeRedis } from './config/redis.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
+import { providersRouter } from './routes/providers.js';
 import { generalLimiter } from './middleware/rateLimit.js';
 import { fail } from './lib/response.js';
 
@@ -20,6 +21,7 @@ app.use('/api/health', healthRouter);
 
 app.use('/api', generalLimiter);
 app.use('/api/auth', authRouter);
+app.use('/api/providers', providersRouter);
 
 app.use((_req, res) => {
   res.status(404).json(fail('NOT_FOUND', 'Route not found'));
