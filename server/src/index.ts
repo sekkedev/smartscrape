@@ -6,6 +6,7 @@ import { closeQueue, startWorker } from './services/job-queue.js';
 import { closeScraper } from './services/scraper.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
+import { dashboardRouter } from './routes/dashboard.js';
 import { googleRouter } from './routes/google.js';
 import { jobsRouter } from './routes/jobs.js';
 import { notificationsRouter } from './routes/notifications.js';
@@ -32,6 +33,7 @@ app.use('/api/jobs', jobsRouter);
 app.use('/api/runs', runsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/google', googleRouter);
+app.use('/api/dashboard', dashboardRouter);
 
 app.use((_req, res) => {
   res.status(404).json(fail('NOT_FOUND', 'Route not found'));
