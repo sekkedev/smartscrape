@@ -31,7 +31,7 @@ export type JobRow = {
   name: string;
   urls: string[];
   extraction_prompt: string;
-  extraction_schema: Record<string, string> | null;
+  extraction_schema: Record<string, 'string' | 'number' | 'boolean' | 'array' | 'object'> | null;
   scrape_method: ScrapeMethod;
   schedule: string | null;
   enabled: boolean;
@@ -67,7 +67,7 @@ export type CreateJobArgs = {
   name: string;
   urls: string[];
   extraction_prompt: string;
-  extraction_schema: Record<string, string> | null;
+  extraction_schema: Record<string, 'string' | 'number' | 'boolean' | 'array' | 'object'> | null;
   scrape_method?: ScrapeMethod;
   schedule?: string | null;
   enabled?: boolean;
