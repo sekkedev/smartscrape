@@ -4,6 +4,7 @@ import { fail, ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { findRun, listDataForRun, toDTO as toRunDTO } from '../db/runs.js';
+import { diffRun } from '../services/change-detector.js';
 
 export const runsRouter = Router();
 runsRouter.use(requireAuth);
@@ -18,6 +19,16 @@ runsRouter.get('/:id', validate(idParam, 'params'), async (req, res) => {
     return;
   }
   res.status(200).json(ok({ run: toRunDTO(row) }));
+});
+
+runsRouter.get('/:id/diff', validate(idParam, 'params'), async (req, res) => {
+  const { id } = req.params as unknown as z.infer<typeof idParam>;
+  const diff = await diffRun(req.user!.id, id);
+  if (!diff) {
+    res.status(404).json(fail('NOT_FOUND', 'Run not found'));
+    return;
+  }
+  res.status(200).json(ok({ diff }));
 });
 
 runsRouter.get('/:id/data', validate(idParam, 'params'), async (req, res) => {
