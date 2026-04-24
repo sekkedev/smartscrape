@@ -13,6 +13,7 @@ export default function JobDetail() {
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [runningNow, setRunningNow] = useState(false);
 
   const load = useCallback(async () => {
     const [jr, rr] = await Promise.all([
@@ -30,6 +31,24 @@ export default function JobDetail() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // While any run is in-flight, poll every 3s so the UI tracks the lifecycle.
+  useEffect(() => {
+    const inFlight = runs?.some((r) =>
+      ['pending', 'scraping', 'extracting', 'exporting'].includes(r.status),
+    );
+    if (!inFlight) return;
+    const t = setInterval(() => void load(), 3_000);
+    return () => clearInterval(t);
+  }, [runs, load]);
+
+  async function runNow() {
+    setRunningNow(true);
+    const res = await api<{ run: Run }>(`/api/jobs/${id}/run`, { method: 'POST' });
+    setRunningNow(false);
+    if (!res.success) setError(res.error.message);
+    else void load();
+  }
 
   async function remove() {
     if (!confirm('Delete this job and all its runs? This cannot be undone.')) return;
@@ -74,7 +93,7 @@ export default function JobDetail() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" disabled title="Wired up in the next release">
+            <Button onClick={runNow} loading={runningNow}>
               Run now
             </Button>
             <Link to={`/jobs/${job.id}/edit`}>

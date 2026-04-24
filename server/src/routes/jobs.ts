@@ -19,6 +19,8 @@ import { decrypt } from '../config/encryption.js';
 import { scrape } from '../services/scraper.js';
 import { suggest } from '../services/ai-setup.js';
 import { extract } from '../services/ai-extractor.js';
+import { enqueueNow, syncSchedule } from '../services/job-queue.js';
+import { createRun, toDTO as toRunDTO } from '../db/runs.js';
 import { getPool } from '../config/database.js';
 
 export const jobsRouter = Router();
@@ -249,6 +251,7 @@ jobsRouter.post('/', validate(createBody), async (req, res) => {
     ...body,
     extraction_schema: body.extraction_schema ?? null,
   });
+  await syncSchedule({ jobId: row.id, userId: row.user_id, enabled: row.enabled, schedule: row.schedule });
   res.status(201).json(ok({ job: toJobDTO(row) }));
 });
 
@@ -277,6 +280,7 @@ jobsRouter.patch('/:id', validate(idParam, 'params'), validate(updateBody), asyn
     res.status(404).json(fail('NOT_FOUND', 'Job not found'));
     return;
   }
+  await syncSchedule({ jobId: row.id, userId: row.user_id, enabled: row.enabled, schedule: row.schedule });
   res.status(200).json(ok({ job: toJobDTO(row) }));
 });
 
@@ -287,17 +291,32 @@ jobsRouter.patch('/:id/toggle', validate(idParam, 'params'), async (req, res) =>
     res.status(404).json(fail('NOT_FOUND', 'Job not found'));
     return;
   }
+  await syncSchedule({ jobId: row.id, userId: row.user_id, enabled: row.enabled, schedule: row.schedule });
   res.status(200).json(ok({ job: toJobDTO(row) }));
 });
 
 jobsRouter.delete('/:id', validate(idParam, 'params'), async (req, res) => {
   const { id } = req.params as unknown as z.infer<typeof idParam>;
+  // Clear any scheduled repeatable for this job before deleting.
+  await syncSchedule({ jobId: id, userId: req.user!.id, enabled: false, schedule: null });
   const removed = await deleteJob(req.user!.id, id);
   if (!removed) {
     res.status(404).json(fail('NOT_FOUND', 'Job not found'));
     return;
   }
   res.status(200).json(ok({ removed: true }));
+});
+
+jobsRouter.post('/:id/run', validate(idParam, 'params'), async (req, res) => {
+  const { id } = req.params as unknown as z.infer<typeof idParam>;
+  const job = await findJob(req.user!.id, id);
+  if (!job) {
+    res.status(404).json(fail('NOT_FOUND', 'Job not found'));
+    return;
+  }
+  const run = await createRun(job.id);
+  await enqueueNow({ jobId: job.id, userId: job.user_id, runId: run.id });
+  res.status(202).json(ok({ run: toRunDTO(run) }));
 });
 
 jobsRouter.get('/:id/runs', validate(idParam, 'params'), async (req, res) => {

@@ -2,6 +2,7 @@ import express from 'express';
 import { env, requireSecrets } from './config/env.js';
 import { closeDatabase } from './config/database.js';
 import { closeRedis } from './config/redis.js';
+import { closeQueue, startWorker } from './services/job-queue.js';
 import { closeScraper } from './services/scraper.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
@@ -52,10 +53,21 @@ const server = app.listen(env.port, () => {
   console.log(`[server] listening on http://localhost:${env.port}`);
 });
 
+// Start the BullMQ worker in-process. For production deployments this would
+// typically run in its own service; single-process is fine for dev + v1.
+if (env.redisUrl) {
+  try {
+    startWorker();
+    console.log('[queue] worker started');
+  } catch (err) {
+    console.error('[queue] failed to start worker', err);
+  }
+}
+
 async function shutdown(signal: string): Promise<void> {
   console.log(`[server] received ${signal}, shutting down`);
   server.close(() => undefined);
-  await Promise.allSettled([closeDatabase(), closeRedis(), closeScraper()]);
+  await Promise.allSettled([closeQueue(), closeDatabase(), closeRedis(), closeScraper()]);
   process.exit(0);
 }
 
