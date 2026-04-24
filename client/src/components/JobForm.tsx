@@ -55,6 +55,19 @@ export function jobToFormValues(job: Job): JobFormValues {
   };
 }
 
+/**
+ * Accept anything the user pastes and return the bare sheet ID. Users often
+ * paste the whole URL (https://docs.google.com/spreadsheets/d/XYZ/edit?\u2026)
+ * rather than the ID.
+ */
+function extractSheetId(input: string): string | null {
+  const s = input.trim();
+  if (!s) return null;
+  const match = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) return match[1]!;
+  return s;
+}
+
 export const EMPTY_FORM: JobFormValues = {
   name: '',
   urls: [''],
@@ -324,8 +337,8 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
           <FormField
             label="Sheet ID"
             value={v.google_sheet_id ?? ''}
-            onChange={(e) => setV({ ...v, google_sheet_id: e.target.value || null })}
-            placeholder="1a2b3c4d... (from the sheet URL)"
+            onChange={(e) => setV({ ...v, google_sheet_id: extractSheetId(e.target.value) })}
+            placeholder="Paste the full URL or just the ID"
           />
           <FormField
             label="Tab name"

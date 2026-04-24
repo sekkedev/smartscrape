@@ -105,6 +105,7 @@ export type Run = {
   items_extracted: number;
   tokens_used: number;
   error_message: string | null;
+  export_error: string | null;
   started_at: string;
   completed_at: string | null;
 };

@@ -86,20 +86,24 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
     await insertExtractedData(run.id, job.id, allBatches);
 
     // Optional: export to Google Sheets if the job has one linked and the user is connected.
+    let exportError: string | null = null;
     if (job.google_sheet_id && allBatches.length > 0) {
-      try {
-        await updateRun(run.id, { status: 'exporting' });
-        const conn = await findConnection(job.user_id);
-        if (conn) {
+      await updateRun(run.id, { status: 'exporting' });
+      const conn = await findConnection(job.user_id);
+      if (!conn) {
+        exportError = 'Google Sheets export skipped: user has not connected Google.';
+      } else {
+        try {
           await pushRows({
             userId: job.user_id,
             sheetId: job.google_sheet_id,
             tabName: job.sheet_tab_name,
             rows: allBatches.map((b) => b.data),
           });
+        } catch (err) {
+          exportError = err instanceof Error ? err.message : String(err);
+          console.error('[runner] sheets export failed', exportError);
         }
-      } catch (err) {
-        console.error('[runner] sheets export failed', err);
       }
     }
 
@@ -108,6 +112,7 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
       urls_scraped: urlsScraped,
       items_extracted: itemsExtracted,
       tokens_used: tokensUsed,
+      export_error: exportError,
       completed_at: new Date(),
     });
     await getPool().query(`UPDATE scrape_jobs SET last_run_at = now() WHERE id = $1`, [job.id]);

@@ -170,6 +170,14 @@ export default function JobDetail() {
                     <tr>
                       <td className="py-2">
                         <StatusBadge status={r.status} />
+                        {r.export_error && (
+                          <span
+                            className="ml-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                            title={r.export_error}
+                          >
+                            ⚠ export
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 font-mono text-xs">{r.items_extracted}</td>
                       <td className="py-2 font-mono text-xs">{r.tokens_used}</td>
@@ -204,6 +212,13 @@ export default function JobDetail() {
                         )}
                       </td>
                     </tr>
+                    {r.export_error && (
+                      <tr>
+                        <td colSpan={6} className="bg-amber-50/60 px-2 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                          <span className="font-medium">Sheets export:</span> {r.export_error}
+                        </td>
+                      </tr>
+                    )}
                     {openDiff === r.id && (
                       <tr>
                         <td colSpan={6} className="bg-gray-50 px-2 py-3 dark:bg-gray-950/40">

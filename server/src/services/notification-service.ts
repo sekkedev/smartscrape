@@ -48,14 +48,34 @@ function compare(operator: string, lhs: unknown, rhs: number | string): boolean 
   }
 }
 
+/** Cap per-item rules so a huge batch can't flood a user. */
+const PER_RULE_ITEM_CAP = 3;
+
+function capPerItem(
+  rule: NotificationRule,
+  matches: EvaluatedNotification[],
+): EvaluatedNotification[] {
+  if (matches.length <= PER_RULE_ITEM_CAP) return matches;
+  const head = matches.slice(0, PER_RULE_ITEM_CAP);
+  head.push({
+    type: 'change_detected',
+    message: `\u2026and ${matches.length - PER_RULE_ITEM_CAP} more matches for rule "${rule.type}".`,
+  });
+  return head;
+}
+
 export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotification[] {
   const out: EvaluatedNotification[] = [];
   const rules: NotificationRule[] = job.notification_rules;
   const globals = { job_name: job.name };
+  // First run (no predecessor) = "initial inventory", not a change. Skip rules
+  // that only make sense across runs so users don't get flooded on day one.
+  const isFirstRun = diff.previous_run === null;
 
   for (const rule of rules) {
     switch (rule.type) {
       case 'any_change': {
+        if (isFirstRun) break;
         if (diff.added.length > 0 || diff.removed.length > 0 || diff.changed.length > 0) {
           const url = String((diff.added[0] ?? diff.changed[0]?.after ?? diff.removed[0])?.url ?? '');
           out.push({
@@ -66,6 +86,7 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
         break;
       }
       case 'new_items': {
+        if (isFirstRun) break;
         if (diff.added.length > 0) {
           out.push({
             type: 'change_detected',
@@ -78,6 +99,7 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
         break;
       }
       case 'removed_items': {
+        if (isFirstRun) break;
         if (diff.removed.length > 0) {
           out.push({
             type: 'change_detected',
@@ -90,12 +112,15 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
         break;
       }
       case 'field_threshold': {
-        // Check added + changed.after items for the threshold.
+        // Skip on first run: every baseline item would match and spam the user.
+        if (isFirstRun) break;
+        // Only alert on NEW items crossing the threshold, not every existing match.
         const candidates = [...diff.added, ...diff.changed.map((c) => c.after)];
+        const matches: EvaluatedNotification[] = [];
         for (const item of candidates) {
           const value = (item as Record<string, unknown>)[rule.field];
           if (compare(rule.operator, value, rule.value)) {
-            out.push({
+            matches.push({
               type: 'change_detected',
               message: interpolate(
                 rule.message ?? `{job_name}: ${rule.field} is ${value} ({operator} ${rule.value})`,
@@ -110,13 +135,16 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
             });
           }
         }
+        out.push(...capPerItem(rule, matches));
         break;
       }
       case 'field_change': {
+        // field_change can never fire on first run (no `changed` items yet).
+        const matches: EvaluatedNotification[] = [];
         for (const ch of diff.changed) {
           const match = ch.field_diffs.find((f) => f.field === rule.field);
           if (!match) continue;
-          out.push({
+          matches.push({
             type: 'change_detected',
             message: interpolate(rule.message ?? '{job_name}: {field_name} changed from {old} to {new}', {
               ...globals,
@@ -127,6 +155,7 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
             }),
           });
         }
+        out.push(...capPerItem(rule, matches));
         break;
       }
     }
