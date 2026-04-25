@@ -62,7 +62,11 @@ export async function assertSafeUrl(input: string): Promise<UrlCheckResult> {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     return { ok: false, reason: 'Only http and https URLs are supported' };
   }
-  const hostname = url.hostname;
+  // Node's URL keeps the brackets on IPv6 hostnames (e.g. `[::1]`), but
+  // net.isIP wants the bare address. Strip them before any check.
+  const hostname = url.hostname.startsWith('[') && url.hostname.endsWith(']')
+    ? url.hostname.slice(1, -1)
+    : url.hostname;
   if (!hostname) return { ok: false, reason: 'Missing hostname' };
 
   // Literal IPs: check directly.
