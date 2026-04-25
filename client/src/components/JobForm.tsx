@@ -27,6 +27,7 @@ export type JobFormValues = {
   ai_model: string;
   google_sheet_id: string | null;
   sheet_tab_name: string | null;
+  respect_robots_txt: boolean;
 };
 
 const SCHEDULE_OPTIONS: { label: string; value: string | null }[] = [
@@ -53,6 +54,7 @@ export function jobToFormValues(job: Job): JobFormValues {
     ai_model: job.ai_model,
     google_sheet_id: job.google_sheet_id,
     sheet_tab_name: job.sheet_tab_name,
+    respect_robots_txt: job.respect_robots_txt,
   };
 }
 
@@ -83,6 +85,7 @@ export const EMPTY_FORM: JobFormValues = {
   ai_model: 'openai/gpt-4o-mini',
   google_sheet_id: null,
   sheet_tab_name: null,
+  respect_robots_txt: true,
 };
 
 type Props = {
@@ -278,6 +281,15 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
               <option value="cheerio">Cheerio only (static)</option>
               <option value="playwright">Playwright only (browser)</option>
             </select>
+            <label className="mt-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              <input
+                type="checkbox"
+                checked={v.respect_robots_txt}
+                onChange={(e) => setV({ ...v, respect_robots_txt: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Respect robots.txt for the configured user agent
+            </label>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Schedule</label>

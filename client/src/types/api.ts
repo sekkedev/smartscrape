@@ -87,6 +87,7 @@ export type Job = {
   google_sheet_id: string | null;
   sheet_tab_name: string | null;
   setup_method: SetupMethod;
+  respect_robots_txt: boolean;
   last_run_at: string | null;
   created_at: string;
   updated_at: string;
