@@ -2,6 +2,7 @@
 // the module empty before the typed default — type the call signature
 // ourselves and cast through unknown.
 import robotsParser from 'robots-parser';
+import { assertSafeUrl } from '../lib/ssrf.js';
 
 type Robot = {
   isAllowed(url: string, ua?: string): boolean | undefined;
@@ -12,6 +13,8 @@ const parse = robotsParser as unknown as RobotsParserFn;
 
 const TTL_MS = 60 * 60 * 1000; // 1 hour
 const FETCH_TIMEOUT_MS = 5_000;
+const MAX_ROBOTS_BYTES = 512 * 1024; // 512 KB — robots.txt above this is pathological
+const MAX_REDIRECTS = 5;
 
 type CacheEntry = { parser: Robot; expiresAt: number };
 
@@ -45,13 +48,49 @@ export async function isAllowedByRobots(targetUrl: string, userAgent: string): P
   return allowed !== false;
 }
 
+/**
+ * Fetch robots.txt with the same SSRF discipline as the main scraper:
+ *   - manual redirect handling, re-validate every hop with assertSafeUrl
+ *   - cap body size so a malicious robots.txt can't DoS us
+ *
+ * Without this, a public site whose /robots.txt 302s to http://169.254.169.254/
+ * would let the robots fetch reach the metadata endpoint even though the
+ * scraper proper now refuses redirects to private IPs.
+ */
 async function fetchRobots(url: string): Promise<string> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { redirect: 'follow', signal: ac.signal });
-    if (!res.ok) return '';
-    return await res.text();
+    let currentUrl = url;
+    let res: Response | undefined;
+    for (let hop = 0; hop < MAX_REDIRECTS; hop++) {
+      const safety = await assertSafeUrl(currentUrl);
+      if (!safety.ok) return '';
+      res = await fetch(currentUrl, { redirect: 'manual', signal: ac.signal });
+      if (res.status >= 300 && res.status < 400) {
+        const next = res.headers.get('location');
+        if (!next) break;
+        currentUrl = new URL(next, currentUrl).toString();
+        continue;
+      }
+      break;
+    }
+    if (!res || !res.ok || !res.body) return '';
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > MAX_ROBOTS_BYTES) {
+        void reader.cancel();
+        return '';
+      }
+      chunks.push(value);
+    }
+    return Buffer.concat(chunks.map((c) => Buffer.from(c.buffer, c.byteOffset, c.byteLength))).toString('utf8');
   } catch {
     return '';
   } finally {
