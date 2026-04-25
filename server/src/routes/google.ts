@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { deleteConnection, findConnection } from '../db/googleConnections.js';
 import { fail, ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
+import { userGeneralLimiter } from '../middleware/rateLimit.js';
 import { z } from 'zod';
 import {
   buildAuthUrl,
@@ -21,7 +22,7 @@ const NONCE_COOKIE_MAX_AGE_MS = 10 * 60 * 1000; // matches state expiry
 
 export const googleRouter = Router();
 
-googleRouter.get('/status', requireAuth, async (req, res) => {
+googleRouter.get('/status', requireAuth, userGeneralLimiter,async (req, res) => {
   const conn = await findConnection(req.user!.id);
   res.status(200).json(
     ok({
@@ -33,7 +34,7 @@ googleRouter.get('/status', requireAuth, async (req, res) => {
   );
 });
 
-googleRouter.get('/connect', requireAuth, (req, res) => {
+googleRouter.get('/connect', requireAuth, userGeneralLimiter,(req, res) => {
   if (!isConfigured()) {
     res.status(400).json(fail('NOT_CONFIGURED', 'Google OAuth is not configured on this server'));
     return;
@@ -100,7 +101,7 @@ googleRouter.get('/callback', async (req, res) => {
   }
 });
 
-googleRouter.delete('/disconnect', requireAuth, async (req, res) => {
+googleRouter.delete('/disconnect', requireAuth, userGeneralLimiter,async (req, res) => {
   await revokeConnection(req.user!.id);
   await deleteConnection(req.user!.id);
   res.status(200).json(ok({ disconnected: true }));
@@ -111,6 +112,7 @@ const sheetsListQuery = z.object({ q: z.string().max(200).optional() });
 googleRouter.get(
   '/sheets',
   requireAuth,
+  userGeneralLimiter,
   validate(sheetsListQuery, 'query'),
   async (req, res) => {
     const conn = await findConnection(req.user!.id);

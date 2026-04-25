@@ -4,6 +4,16 @@ import type { Provider } from '../db/apiKeys.js';
 
 export type ExtractionSchema = Record<string, 'string' | 'number' | 'boolean' | 'array' | 'object'>;
 
+/**
+ * Two flavours of leak guard:
+ *   - `apiKeyGuards`: long, high-entropy strings (provider keys, tokens). We
+ *     length-floor these to 16 chars so a short test/placeholder key can't
+ *     cause false-positive injection rejections by appearing as a substring
+ *     of legitimately-scraped text.
+ *   - `emailGuards`: user emails, which can be as short as `a@b.co`. The `@`
+ *     plus dot in the local form makes false positives vanishingly unlikely,
+ *     so no floor is applied — short emails still get exact-substring guarded.
+ */
 export type ExtractArgs = {
   provider: Provider;
   apiKey: string;
@@ -11,11 +21,13 @@ export type ExtractArgs = {
   cleanedHtml: string;
   extractionPrompt: string;
   extractionSchema?: ExtractionSchema;
-  /** Values we refuse to echo (stored secrets, the user's email, etc). */
-  secretGuards?: string[];
+  apiKeyGuards?: string[];
+  emailGuards?: string[];
   /** Cap for each extracted item's serialized size, default 16 KB. */
   itemSizeCap?: number;
 };
+
+const API_KEY_GUARD_MIN_LENGTH = 16;
 
 export type ExtractResult =
   | { ok: true; items: Record<string, unknown>[]; usage: ChatUsage; rawText: string }
@@ -167,13 +179,19 @@ export async function extract(args: ExtractArgs): Promise<ExtractResult> {
           }
         }
       }
-      // Secret leak check. Skip guards shorter than 16 chars to avoid false
-      // positives — a 6-char placeholder can incidentally match scraped text.
-      // Real provider keys + emails are well above this floor.
-      if (args.secretGuards && args.secretGuards.length > 0) {
+      // Secret leak check. API keys are length-floored (16) to avoid
+      // false-positive matches on short placeholders; emails are not floored
+      // because the @-and-dot pattern keeps false-positive risk near zero.
+      const guards: string[] = [];
+      for (const k of args.apiKeyGuards ?? []) {
+        if (k && k.length >= API_KEY_GUARD_MIN_LENGTH) guards.push(k);
+      }
+      for (const e of args.emailGuards ?? []) {
+        if (e) guards.push(e);
+      }
+      if (guards.length > 0) {
         const serialized = JSON.stringify(items);
-        for (const secret of args.secretGuards) {
-          if (!secret || secret.length < 16) continue;
+        for (const secret of guards) {
           if (serialized.includes(secret)) {
             return {
               ok: false,
