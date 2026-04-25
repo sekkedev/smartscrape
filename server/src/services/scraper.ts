@@ -62,11 +62,28 @@ async function fetchWithCap(
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(new Error('Request timeout after 15s')), 15_000);
   try {
-    const res = await fetch(url, {
-      headers: { 'user-agent': USER_AGENT, accept: 'text/html,application/xhtml+xml' },
-      redirect: 'follow',
-      signal: signal ?? ac.signal,
-    });
+    // Manual redirect handling so each hop is re-validated by the SSRF guard.
+    // `redirect: 'follow'` would cheerfully chase a 302 to http://169.254.169.254
+    // even though the original URL passed the guard.
+    let currentUrl = url;
+    let res: Response | undefined;
+    for (let hop = 0; hop < 5; hop++) {
+      const safety = await assertSafeUrl(currentUrl);
+      if (!safety.ok) throw new Error(`Refused redirect to ${currentUrl}: ${safety.reason}`);
+      res = await fetch(currentUrl, {
+        headers: { 'user-agent': USER_AGENT, accept: 'text/html,application/xhtml+xml' },
+        redirect: 'manual',
+        signal: signal ?? ac.signal,
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const next = res.headers.get('location');
+        if (!next) break;
+        currentUrl = new URL(next, currentUrl).toString();
+        continue;
+      }
+      break;
+    }
+    if (!res) throw new Error('No response');
     const contentLength = Number.parseInt(res.headers.get('content-length') ?? '0', 10);
     if (Number.isFinite(contentLength) && contentLength > MAX_BYTES) {
       throw new Error(`Page too large (${contentLength} bytes > ${MAX_BYTES})`);
@@ -92,6 +109,29 @@ async function fetchWithCap(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Block any Playwright request that resolves to a private/loopback/metadata IP.
+ * Without this, a public-looking URL can issue sub-resource requests, follow
+ * redirects, or DNS-rebind into the internal network mid-render.
+ */
+async function attachSsrfRouteGuard(
+  ctx: import('playwright').BrowserContext,
+): Promise<void> {
+  await ctx.route('**/*', async (route) => {
+    const reqUrl = route.request().url();
+    if (reqUrl.startsWith('data:') || reqUrl.startsWith('blob:')) {
+      await route.continue();
+      return;
+    }
+    const safety = await assertSafeUrl(reqUrl);
+    if (!safety.ok) {
+      await route.abort('addressunreachable');
+      return;
+    }
+    await route.continue();
+  });
 }
 
 let sharedBrowser: Browser | null = null;
@@ -145,6 +185,7 @@ async function fetchViaPlaywright(
     },
   });
   try {
+    await attachSsrfRouteGuard(ctx);
     const page = await ctx.newPage();
     // `domcontentloaded` is more forgiving than `networkidle` on pages with
     // persistent XHR/websocket activity (analytics etc).
