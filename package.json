@@ -1,6 +1,6 @@
 {
   "name": "smartscrape",
-  "version": "0.0.1",
+  "version": "0.9.0",
   "private": true,
   "description": "AI-powered self-hosted web scraping with structured extraction, change detection, and notifications.",
   "license": "MIT",
