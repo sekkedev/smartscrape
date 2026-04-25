@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { env, requireSecrets } from './config/env.js';
 import { closeDatabase } from './config/database.js';
 import { closeRedis } from './config/redis.js';
@@ -72,6 +75,24 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/google', googleRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/settings', settingsRouter);
+
+// In production, serve the built client SPA from the same origin as the API.
+// CLIENT_DIST_DIR can override the default for unusual deploy layouts; the
+// default walks up from the running file (works for both `dist/index.js` and
+// `src/index.ts` via tsx). Skips silently in dev so Vite owns the SPA there.
+{
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidate =
+    process.env.CLIENT_DIST_DIR ?? resolve(here, '..', '..', '..', 'client', 'dist');
+  if (env.nodeEnv === 'production' && existsSync(candidate)) {
+    app.use(express.static(candidate, { index: false }));
+    // SPA fallback: any non-/api path returns index.html so client-side routing works.
+    app.get(/^(?!\/api\/).*/, (_req, res) => {
+      res.sendFile(resolve(candidate, 'index.html'));
+    });
+    console.log(`[server] serving client from ${candidate}`);
+  }
+}
 
 app.use((_req, res) => {
   res.status(404).json(fail('NOT_FOUND', 'Route not found'));

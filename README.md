@@ -61,29 +61,35 @@ AI provider keys (never displayed after save), Google Sheets OAuth, Telegram bot
 
 ## Quickstart
 
-Prereqs: Node 20+, Docker Desktop (for Postgres + Redis), `npm` 10+.
+Prereqs: Docker (or Node 20+ for the dev path), `npm` 10+.
+
+### Self-host (Docker, recommended)
 
 ```bash
-# 1. Clone + install
+git clone https://github.com/9ny4/smartscrape.git
+cd smartscrape
+cp .env.example .env
+# Fill in the three required secrets — generation snippets are inside .env.example.
+
+docker compose --profile app up -d --build
+```
+
+Open <http://localhost:3000>. Migrations run on container start; the API also serves the built SPA from the same origin.
+
+### Develop
+
+```bash
 git clone https://github.com/9ny4/smartscrape.git
 cd smartscrape
 npm install
-
-# 2. Install the Chromium the scraper uses
 npx playwright install chromium
 
-# 3. Copy the env template and fill it in
 cp .env.example .env
-# Generate secrets:
-#   JWT_SECRET / JWT_REFRESH_SECRET:  node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-#   ENCRYPTION_KEY:                   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Same three secrets as above.
 
-# 4. Start Postgres + Redis, run migrations
-docker compose up -d
+docker compose up -d                       # Postgres + Redis only
 npm run migrate:up --workspace server
-
-# 5. Start the app
-npm run dev
+npm run dev                                # API on :3000, Vite SPA on :5173
 ```
 
 - Frontend: <http://localhost:5173>

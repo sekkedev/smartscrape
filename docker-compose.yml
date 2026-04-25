@@ -29,6 +29,51 @@ services:
       timeout: 5s
       retries: 10
 
+  # The application image. Built from the local Dockerfile by default, so
+  # `docker compose --profile app up -d --build` Just Works for self-hosters.
+  # The `app` profile keeps this off the local-dev path — `docker compose
+  # up -d` (no profile) brings up just Postgres + Redis for `npm run dev`.
+  app:
+    build: .
+    image: smartscrape:local
+    profiles: ['app']
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://smartscrape:smartscrape@postgres:5432/smartscrape
+      REDIS_URL: redis://redis:6379
+      # Required at boot. Generate with the snippets in .env.example.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      # Same-origin in this single-container layout: the API serves the SPA.
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      API_URL: ${API_URL:-http://localhost:3000}
+      NODE_ENV: production
+      # Optional integrations. Empty defaults are fine; the app degrades
+      # gracefully (no email sender, no Telegram bot, etc).
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@smartscrape.local}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/google/callback}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/health > /dev/null || exit 1']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
 volumes:
   postgres_data:
   redis_data:
