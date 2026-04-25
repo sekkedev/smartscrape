@@ -10,6 +10,12 @@ export type CronCheckResult = { ok: true } | { ok: false; reason: string };
  * flood BullMQ and drain provider quota.
  */
 export function validateCron(expr: string): CronCheckResult {
+  // The route layer treats empty/null as "no schedule". Anything that reaches
+  // validateCron should be a real expression — reject empty explicitly so the
+  // function can't be silently called with no input.
+  if (typeof expr !== 'string' || expr.trim().length === 0) {
+    return { ok: false, reason: 'Invalid cron' };
+  }
   let it: ReturnType<typeof CronExpressionParser.parse>;
   try {
     it = CronExpressionParser.parse(expr);
