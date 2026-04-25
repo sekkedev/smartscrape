@@ -6,6 +6,12 @@ import { fail, ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import {
+  aiSetupLimiter,
+  runTriggerLimiter,
+  sheetsPushLimiter,
+  userGeneralLimiter,
+} from '../middleware/rateLimit.js';
+import {
   createJob,
   deleteJob,
   findJob,
@@ -30,6 +36,8 @@ import { getPool } from '../config/database.js';
 
 export const jobsRouter = Router();
 jobsRouter.use(requireAuth);
+// Per-user general cap (100/min). Specific routes layer tighter limits below.
+jobsRouter.use(userGeneralLimiter);
 
 // ---------- schemas ----------
 
@@ -154,7 +162,7 @@ async function resolveProviderKey(
   }
 }
 
-jobsRouter.post('/ai-setup', validate(aiSetupBody), async (req, res) => {
+jobsRouter.post('/ai-setup', aiSetupLimiter, validate(aiSetupBody), async (req, res) => {
   const body = req.body as z.infer<typeof aiSetupBody>;
   const safety = await assertSafeUrl(body.url);
   if (!safety.ok) {
@@ -194,7 +202,7 @@ jobsRouter.post('/ai-setup', validate(aiSetupBody), async (req, res) => {
   );
 });
 
-jobsRouter.post('/ai-setup/preview', validate(aiPreviewBody), async (req, res) => {
+jobsRouter.post('/ai-setup/preview', aiSetupLimiter, validate(aiPreviewBody), async (req, res) => {
   const body = req.body as z.infer<typeof aiPreviewBody>;
   const safety = await assertSafeUrl(body.url);
   if (!safety.ok) {
@@ -326,7 +334,7 @@ jobsRouter.delete('/:id', validate(idParam, 'params'), async (req, res) => {
   res.status(200).json(ok({ removed: true }));
 });
 
-jobsRouter.post('/:id/run', validate(idParam, 'params'), async (req, res) => {
+jobsRouter.post('/:id/run', runTriggerLimiter, validate(idParam, 'params'), async (req, res) => {
   const { id } = req.params as unknown as z.infer<typeof idParam>;
   const job = await findJob(req.user!.id, id);
   if (!job) {
@@ -391,7 +399,7 @@ jobsRouter.get('/:id/export/csv/:runId', async (req, res) => {
   await sendCsvForRun(res, id, runId, req.user!.id, job.name);
 });
 
-jobsRouter.post('/:id/export/sheets', validate(idParam, 'params'), async (req, res) => {
+jobsRouter.post('/:id/export/sheets', sheetsPushLimiter, validate(idParam, 'params'), async (req, res) => {
   const { id } = req.params as unknown as z.infer<typeof idParam>;
   const job = await findJob(req.user!.id, id);
   if (!job) {

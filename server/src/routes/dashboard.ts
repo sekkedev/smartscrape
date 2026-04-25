@@ -2,9 +2,11 @@ import { Router } from 'express';
 import { getPool } from '../config/database.js';
 import { ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
+import { userGeneralLimiter } from '../middleware/rateLimit.js';
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireAuth);
+dashboardRouter.use(userGeneralLimiter);
 
 dashboardRouter.get('/stats', async (req, res) => {
   const userId = req.user!.id;

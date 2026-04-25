@@ -4,9 +4,11 @@ import { listForUser, upsertMany } from '../db/settings.js';
 import { ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { userGeneralLimiter } from '../middleware/rateLimit.js';
 
 export const settingsRouter = Router();
 settingsRouter.use(requireAuth);
+settingsRouter.use(userGeneralLimiter);
 
 // Free-form key/value bag, but bound the size of each side so a single bad
 // request can't fill the column. Keys mirror env-style identifiers.
