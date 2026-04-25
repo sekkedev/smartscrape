@@ -36,7 +36,10 @@ export async function insertNotification(args: {
 
 export type ListOpts = { limit?: number; offset?: number; jobId?: string; channel?: Channel };
 
-export async function listNotifications(userId: string, opts: ListOpts = {}): Promise<{ items: NotificationDTO[]; total: number }> {
+export async function listNotifications(
+  userId: string,
+  opts: ListOpts = {},
+): Promise<{ items: NotificationDTO[]; total: number }> {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
   const offset = Math.max(opts.offset ?? 0, 0);
   const params: unknown[] = [userId];

@@ -57,9 +57,12 @@ export function GoogleSheetsCard() {
   }
 
   async function disconnect() {
-    if (!confirm('Disconnect Google? Existing jobs with a linked Sheet will stop exporting.')) return;
+    if (!confirm('Disconnect Google? Existing jobs with a linked Sheet will stop exporting.'))
+      return;
     setWorking(true);
-    const res = await api<{ disconnected: boolean }>('/api/google/disconnect', { method: 'DELETE' });
+    const res = await api<{ disconnected: boolean }>('/api/google/disconnect', {
+      method: 'DELETE',
+    });
     setWorking(false);
     if (!res.success) {
       setError(res.error.message);
@@ -86,14 +89,17 @@ export function GoogleSheetsCard() {
               : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
           }`}
         >
-          <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-gray-400'}`}
+          />
           {connected ? 'Connected' : 'Not connected'}
         </span>
       </header>
 
       {status && !status.configured && (
         <Alert tone="info">
-          Google OAuth isn't configured on this server. Ask the admin to set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.
+          Google OAuth isn't configured on this server. Ask the admin to set GOOGLE_CLIENT_ID and
+          GOOGLE_CLIENT_SECRET.
         </Alert>
       )}
 
@@ -103,8 +109,16 @@ export function GoogleSheetsCard() {
         </p>
       )}
 
-      {error && <Alert tone="error" className="mb-3">{error}</Alert>}
-      {note && <Alert tone="success" className="mb-3">{note}</Alert>}
+      {error && (
+        <Alert tone="error" className="mb-3">
+          {error}
+        </Alert>
+      )}
+      {note && (
+        <Alert tone="success" className="mb-3">
+          {note}
+        </Alert>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {!connected ? (
@@ -120,8 +134,13 @@ export function GoogleSheetsCard() {
 
       {connected && (
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          To export to a sheet, paste the Sheet ID and tab name into a job's config. The Sheet ID is the long path
-          segment in the URL: <span className="font-mono">/spreadsheets/d/<span className="text-indigo-600 dark:text-indigo-400">SHEET_ID</span>/edit</span>.
+          To export to a sheet, paste the Sheet ID and tab name into a job's config. The Sheet ID is
+          the long path segment in the URL:{' '}
+          <span className="font-mono">
+            /spreadsheets/d/<span className="text-indigo-600 dark:text-indigo-400">SHEET_ID</span>
+            /edit
+          </span>
+          .
         </p>
       )}
     </article>

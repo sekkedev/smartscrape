@@ -18,7 +18,9 @@ test.describe('mobile @ 375px', () => {
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
       }));
-      expect.soft(scrollWidth, `horizontal overflow on ${path}`).toBeLessThanOrEqual(clientWidth + 1);
+      expect
+        .soft(scrollWidth, `horizontal overflow on ${path}`)
+        .toBeLessThanOrEqual(clientWidth + 1);
     }
   });
 });

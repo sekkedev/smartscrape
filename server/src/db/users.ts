@@ -37,18 +37,16 @@ export function toPublic(u: UserRow): PublicUser {
 }
 
 export async function findUserByEmail(email: string): Promise<UserRow | null> {
-  const { rows } = await getPool().query<UserRow>(
-    `SELECT * FROM users WHERE email = $1 LIMIT 1`,
-    [email.toLowerCase()],
-  );
+  const { rows } = await getPool().query<UserRow>(`SELECT * FROM users WHERE email = $1 LIMIT 1`, [
+    email.toLowerCase(),
+  ]);
   return rows[0] ?? null;
 }
 
 export async function findUserById(id: string): Promise<UserRow | null> {
-  const { rows } = await getPool().query<UserRow>(
-    `SELECT * FROM users WHERE id = $1 LIMIT 1`,
-    [id],
-  );
+  const { rows } = await getPool().query<UserRow>(`SELECT * FROM users WHERE id = $1 LIMIT 1`, [
+    id,
+  ]);
   return rows[0] ?? null;
 }
 

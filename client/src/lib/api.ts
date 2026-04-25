@@ -1,7 +1,9 @@
 import { useAuth } from '../stores/auth';
 import type { ApiResponse, RefreshResponse } from '../types/api';
 
-const NO_AUTO_REFRESH: RegExp[] = [/^\/api\/auth\/(login|register|refresh|forgot-password|reset-password|verify-email)/];
+const NO_AUTO_REFRESH: RegExp[] = [
+  /^\/api\/auth\/(login|register|refresh|forgot-password|reset-password|verify-email)/,
+];
 
 type RequestOptions = {
   method?: string;

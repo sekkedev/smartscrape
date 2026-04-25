@@ -23,7 +23,9 @@ async function postWithRateLimitRetry(
     // short enough that a full test suite still completes in reasonable time.
     await new Promise((r) => setTimeout(r, 15_000));
   }
-  throw new Error(`exhausted rate-limit retries for ${url}. Restart the server with SKIP_RATE_LIMIT=1.`);
+  throw new Error(
+    `exhausted rate-limit retries for ${url}. Restart the server with SKIP_RATE_LIMIT=1.`,
+  );
 }
 
 export async function registerAndLogin(request: APIRequestContext): Promise<Session> {
@@ -61,11 +63,14 @@ export async function registerAndLogin(request: APIRequestContext): Promise<Sess
  * When a test genuinely needs a pristine no-data user (empty-state assertions),
  * use `freshSession` which registers a fresh user on demand.
  */
-export const test = base.extend<{
-  freshSession: Session;
-}, {
-  sharedSession: Session;
-}>({
+export const test = base.extend<
+  {
+    freshSession: Session;
+  },
+  {
+    sharedSession: Session;
+  }
+>({
   sharedSession: [
     async ({ playwright }, use) => {
       const ctx = await playwright.request.newContext();

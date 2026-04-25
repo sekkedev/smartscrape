@@ -29,7 +29,10 @@ if (command === 'create') {
     .toISOString()
     .replace(/[-:TZ.]/g, '')
     .slice(0, 14);
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
   const file = resolve(migrationsDir, `${stamp}_${slug}.js`);
   writeFileSync(
     file,

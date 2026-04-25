@@ -23,7 +23,10 @@ export async function sendTelegram(chatId: string, text: string): Promise<Telegr
 }
 
 /** Returns the bot's link for user-onboarding. Works even when the bot token is not set locally. */
-export async function getBotSetupInfo(): Promise<{ botUsername: string | null; link: string | null }> {
+export async function getBotSetupInfo(): Promise<{
+  botUsername: string | null;
+  link: string | null;
+}> {
   const token = process.env.TELEGRAM_BOT_TOKEN ?? '';
   if (!token) return { botUsername: null, link: null };
   try {

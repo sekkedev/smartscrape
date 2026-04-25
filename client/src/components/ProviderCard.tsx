@@ -48,7 +48,9 @@ export function ProviderCard({ provider, label, description, summary, onChange }
 
   async function test() {
     setStatus({ kind: 'testing' });
-    const res = await api<ProviderTestResult>(`/api/providers/${provider}/test`, { method: 'POST' });
+    const res = await api<ProviderTestResult>(`/api/providers/${provider}/test`, {
+      method: 'POST',
+    });
     if (!res.success) {
       setStatus({ kind: 'error', message: res.error.message });
       return;
@@ -84,9 +86,7 @@ export function ProviderCard({ provider, label, description, summary, onChange }
           }`}
         >
           <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              connected ? 'bg-emerald-500' : 'bg-gray-400'
-            }`}
+            className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-gray-400'}`}
           />
           {connected ? 'Connected' : 'Not configured'}
         </span>
@@ -105,8 +105,14 @@ export function ProviderCard({ provider, label, description, summary, onChange }
           autoComplete="off"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder={connected ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (enter to replace)' : 'Paste key'}
-          hint={connected ? 'Saved keys are never displayed. Enter a new key to replace.' : undefined}
+          placeholder={
+            connected
+              ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (enter to replace)'
+              : 'Paste key'
+          }
+          hint={
+            connected ? 'Saved keys are never displayed. Enter a new key to replace.' : undefined
+          }
         />
       </div>
 
@@ -130,11 +136,13 @@ export function ProviderCard({ provider, label, description, summary, onChange }
         <div className="mt-4">
           {status.result.ok ? (
             <Alert tone="success">
-              Credentials valid \u2014 <span className="font-mono">{status.result.latencyMs}ms</span>
+              Credentials valid \u2014{' '}
+              <span className="font-mono">{status.result.latencyMs}ms</span>
             </Alert>
           ) : (
             <Alert tone="error">
-              {status.result.error ?? 'Test failed'} (<span className="font-mono">{status.result.latencyMs}ms</span>)
+              {status.result.error ?? 'Test failed'} (
+              <span className="font-mono">{status.result.latencyMs}ms</span>)
             </Alert>
           )}
         </div>

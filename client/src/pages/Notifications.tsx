@@ -15,7 +15,9 @@ export default function Notifications() {
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (channel !== 'all') params.set('channel', channel);
-    const res = await api<{ items: NotificationItem[]; total: number }>(`/api/notifications?${params.toString()}`);
+    const res = await api<{ items: NotificationItem[]; total: number }>(
+      `/api/notifications?${params.toString()}`,
+    );
     if (res.success) {
       setItems(res.data.items);
       setTotal(res.data.total);
@@ -35,7 +37,9 @@ export default function Notifications() {
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-6 flex items-end justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Notifications</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+              Notifications
+            </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Everything dispatched by your jobs. {total > 0 && `${total} total.`}
             </p>
@@ -74,7 +78,9 @@ export default function Notifications() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-300 bg-white/60 p-10 text-center dark:border-gray-700 dark:bg-gray-900/40">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">No notifications yet</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              No notifications yet
+            </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Once a scheduled run detects changes, dispatches show up here.
             </p>
@@ -108,11 +114,16 @@ export default function Notifications() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <Link to={`/jobs/${n.job_id}`} className="text-indigo-600 hover:underline dark:text-indigo-400">
+                      <Link
+                        to={`/jobs/${n.job_id}`}
+                        className="text-indigo-600 hover:underline dark:text-indigo-400"
+                      >
                         {n.job_name ?? n.job_id.slice(0, 8)}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{n.message ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                      {n.message ?? '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -152,7 +152,9 @@ export default function NewJob() {
       <main className="mx-auto max-w-3xl px-6 py-10">
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">New job</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+              New job
+            </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {mode === 'wizard'
                 ? 'Describe what you want to track and let AI suggest a config.'
@@ -298,7 +300,10 @@ export default function NewJob() {
                         {previewItems.slice(0, 10).map((item, i) => (
                           <tr key={i}>
                             {previewTableKeys.map((k) => (
-                              <td key={k} className="px-3 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">
+                              <td
+                                key={k}
+                                className="px-3 py-2 font-mono text-xs text-gray-700 dark:text-gray-300"
+                              >
                                 {renderValue(item[k])}
                               </td>
                             ))}

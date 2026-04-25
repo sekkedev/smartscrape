@@ -51,7 +51,9 @@ export function TelegramCard() {
   async function test() {
     setStatus(null);
     setTesting(true);
-    const res = await api<{ sent: boolean }>('/api/notifications/test/telegram', { method: 'POST' });
+    const res = await api<{ sent: boolean }>('/api/notifications/test/telegram', {
+      method: 'POST',
+    });
     setTesting(false);
     if (!res.success) {
       setStatus({ tone: 'error', message: res.error.message });
@@ -88,21 +90,22 @@ export function TelegramCard() {
       {info?.link ? (
         <ol className="mb-4 list-decimal space-y-0.5 pl-5 text-xs text-gray-600 dark:text-gray-400">
           {info.instructions.map((line) => (
-            <li key={line}>
-              {/^\d+\.\s/.test(line) ? line.replace(/^\d+\.\s*/, '') : line}
-            </li>
+            <li key={line}>{/^\d+\.\s/.test(line) ? line.replace(/^\d+\.\s*/, '') : line}</li>
           ))}
           <li>
             Bot:{' '}
-            <a href={info.link} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+            <a
+              href={info.link}
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 hover:underline"
+            >
               {info.link}
             </a>
           </li>
         </ol>
       ) : (
-        <p className="mb-4 text-xs text-gray-500">
-          Bot not reachable. Check server config.
-        </p>
+        <p className="mb-4 text-xs text-gray-500">Bot not reachable. Check server config.</p>
       )}
 
       <FormField

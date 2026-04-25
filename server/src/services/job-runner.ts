@@ -29,9 +29,7 @@ export type RunSummary = {
 export const DAILY_RUN_QUOTA = 100;
 
 export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSummary> {
-  const run = existingRunId
-    ? { id: existingRunId, job_id: job.id }
-    : await createRun(job.id);
+  const run = existingRunId ? { id: existingRunId, job_id: job.id } : await createRun(job.id);
 
   // Daily run quota: cap total runs per user per rolling 24h to prevent runaway
   // schedules. Manual triggers also pre-check at the route, but enforcing here
@@ -41,7 +39,14 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
   if (recent - 1 >= DAILY_RUN_QUOTA) {
     const err = `Daily run quota reached (${DAILY_RUN_QUOTA}/24h). Run skipped.`;
     await updateRun(run.id, { status: 'failed', error_message: err, completed_at: new Date() });
-    return { runId: run.id, jobId: job.id, status: 'failed', itemsExtracted: 0, tokensUsed: 0, error: err };
+    return {
+      runId: run.id,
+      jobId: job.id,
+      status: 'failed',
+      itemsExtracted: 0,
+      tokensUsed: 0,
+      error: err,
+    };
   }
 
   const provider = job.ai_provider;
@@ -49,7 +54,14 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
   if (!keyRow) {
     const err = `No ${provider} API key configured`;
     await updateRun(run.id, { status: 'failed', error_message: err, completed_at: new Date() });
-    return { runId: run.id, jobId: job.id, status: 'failed', itemsExtracted: 0, tokensUsed: 0, error: err };
+    return {
+      runId: run.id,
+      jobId: job.id,
+      status: 'failed',
+      itemsExtracted: 0,
+      tokensUsed: 0,
+      error: err,
+    };
   }
   let apiKey: string;
   try {
@@ -57,7 +69,14 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
   } catch {
     const err = 'Stored provider key could not be decrypted';
     await updateRun(run.id, { status: 'failed', error_message: err, completed_at: new Date() });
-    return { runId: run.id, jobId: job.id, status: 'failed', itemsExtracted: 0, tokensUsed: 0, error: err };
+    return {
+      runId: run.id,
+      jobId: job.id,
+      status: 'failed',
+      itemsExtracted: 0,
+      tokensUsed: 0,
+      error: err,
+    };
   }
 
   // Build the leak-guard lists once per run. Split by type so the API-key

@@ -61,15 +61,16 @@ export default function JobDetail() {
 
   async function pushSheets() {
     setPushingSheets(true);
-    const res = await api<{ appended: number; runId: string }>(
-      `/api/jobs/${id}/export/sheets`,
-      { method: 'POST' },
-    );
+    const res = await api<{ appended: number; runId: string }>(`/api/jobs/${id}/export/sheets`, {
+      method: 'POST',
+    });
     setPushingSheets(false);
     if (!res.success) {
       toast.error(res.error.message);
     } else {
-      toast.success(`Appended ${res.data.appended} row${res.data.appended === 1 ? '' : 's'} to Sheets.`);
+      toast.success(
+        `Appended ${res.data.appended} row${res.data.appended === 1 ? '' : 's'} to Sheets.`,
+      );
     }
   }
 
@@ -115,9 +116,12 @@ export default function JobDetail() {
       <main className="mx-auto max-w-4xl px-6 py-10 space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{job.name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+              {job.name}
+            </h1>
             <p className="mt-1 font-mono text-xs text-gray-500">
-              {job.urls.length} URL{job.urls.length === 1 ? '' : 's'} · {job.schedule ?? 'Manual'} · {job.ai_provider}/{job.ai_model}
+              {job.urls.length} URL{job.urls.length === 1 ? '' : 's'} · {job.schedule ?? 'Manual'} ·{' '}
+              {job.ai_provider}/{job.ai_model}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -139,7 +143,9 @@ export default function JobDetail() {
         </div>
 
         <Card title="Extraction">
-          <p className="font-mono text-sm text-gray-900 dark:text-gray-100">{job.extraction_prompt}</p>
+          <p className="font-mono text-sm text-gray-900 dark:text-gray-100">
+            {job.extraction_prompt}
+          </p>
           {job.extraction_schema && (
             <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">
               {Object.entries(job.extraction_schema).map(([k, t]) => (
@@ -203,9 +209,13 @@ export default function JobDetail() {
                       <td className="py-2 font-mono text-xs">{r.tokens_used}</td>
                       <td className="py-2 font-mono text-xs">
                         {r.completed_at
-                          ? `${Math.round(
-                              (new Date(r.completed_at).getTime() - new Date(r.started_at).getTime()) / 100,
-                            ) / 10}s`
+                          ? `${
+                              Math.round(
+                                (new Date(r.completed_at).getTime() -
+                                  new Date(r.started_at).getTime()) /
+                                  100,
+                              ) / 10
+                            }s`
                           : '—'}
                       </td>
                       <td className="py-2 font-mono text-xs text-gray-500">
@@ -216,7 +226,10 @@ export default function JobDetail() {
                           <div className="flex justify-end gap-3">
                             <button
                               onClick={() =>
-                                void downloadBlob(`/api/jobs/${id}/export/csv/${r.id}`, `run-${r.id.slice(0, 8)}.csv`)
+                                void downloadBlob(
+                                  `/api/jobs/${id}/export/csv/${r.id}`,
+                                  `run-${r.id.slice(0, 8)}.csv`,
+                                )
                               }
                               className="text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                             >
@@ -234,7 +247,10 @@ export default function JobDetail() {
                     </tr>
                     {r.export_error && (
                       <tr>
-                        <td colSpan={6} className="bg-amber-50/60 px-2 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                        <td
+                          colSpan={6}
+                          className="bg-amber-50/60 px-2 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+                        >
                           <span className="font-medium">Sheets export:</span> {r.export_error}
                         </td>
                       </tr>
@@ -276,7 +292,9 @@ function StatusBadge({ status }: { status: RunStatus }) {
     failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   };
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${classes[status]}`}>
+    <span
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${classes[status]}`}
+    >
       {status}
     </span>
   );

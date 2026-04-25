@@ -169,7 +169,9 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
           placeholder="Track GPU prices on example.com"
         />
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">URLs</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            URLs
+          </label>
           <div className="space-y-2">
             {v.urls.map((url, i) => (
               <div key={i} className="flex gap-2">
@@ -193,7 +195,11 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
               </div>
             ))}
             {v.urls.length < 10 && (
-              <Button type="button" variant="secondary" onClick={() => setV({ ...v, urls: [...v.urls, ''] })}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setV({ ...v, urls: [...v.urls, ''] })}
+              >
                 + Add URL
               </Button>
             )}
@@ -252,7 +258,8 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
             ))}
             {schemaFields.length === 0 && (
               <p className="text-xs text-gray-500">
-                Leave empty to let the AI infer fields, or add explicit fields to tighten the output.
+                Leave empty to let the AI infer fields, or add explicit fields to tighten the
+                output.
               </p>
             )}
           </div>
@@ -292,10 +299,14 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
             </label>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Schedule</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Schedule
+            </label>
             <select
               value={v.schedule ?? ''}
-              onChange={(e) => setV({ ...v, schedule: e.target.value === '' ? null : e.target.value })}
+              onChange={(e) =>
+                setV({ ...v, schedule: e.target.value === '' ? null : e.target.value })
+              }
               className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
             >
               {SCHEDULE_OPTIONS.map((opt) => (
@@ -305,15 +316,14 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
               ))}
               <option value="custom">Custom cron...</option>
             </select>
-            {v.schedule &&
-              !SCHEDULE_OPTIONS.some((o) => o.value === v.schedule) && (
-                <input
-                  value={v.schedule}
-                  onChange={(e) => setV({ ...v, schedule: e.target.value })}
-                  placeholder="Cron expression"
-                  className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm dark:border-gray-700 dark:bg-gray-900"
-                />
-              )}
+            {v.schedule && !SCHEDULE_OPTIONS.some((o) => o.value === v.schedule) && (
+              <input
+                value={v.schedule}
+                onChange={(e) => setV({ ...v, schedule: e.target.value })}
+                placeholder="Cron expression"
+                className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm dark:border-gray-700 dark:bg-gray-900"
+              />
+            )}
           </div>
         </div>
       </Section>
@@ -321,7 +331,9 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
       <Section title="AI model">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Provider</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Provider
+            </label>
             <select
               value={v.ai_provider}
               onChange={(e) => setV({ ...v, ai_provider: e.target.value as Provider })}
@@ -343,8 +355,8 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
 
       <Section title="Google Sheets (optional)">
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          After each run, extracted rows are appended to the sheet. Connect Google in Settings first, then pick a sheet
-          below or paste an ID directly.
+          After each run, extracted rows are appended to the sheet. Connect Google in Settings
+          first, then pick a sheet below or paste an ID directly.
         </p>
         <SheetPicker
           value={v.google_sheet_id ?? ''}
@@ -375,7 +387,12 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
 
         <div className="space-y-3">
           {v.notification_rules.map((rule, i) => (
-            <RuleEditor key={i} rule={rule} onChange={(r) => updateRule(i, r)} onRemove={() => removeRule(i)} />
+            <RuleEditor
+              key={i}
+              rule={rule}
+              onChange={(r) => updateRule(i, r)}
+              onRemove={() => removeRule(i)}
+            />
           ))}
           <Button type="button" variant="secondary" onClick={addRule}>
             + Add notification rule
@@ -397,7 +414,12 @@ export function JobForm({ initial, submitLabel, submitting, error, onSubmit, onC
   );
 }
 
-type SheetSummary = { id: string; name: string; modifiedTime: string | null; webViewLink: string | null };
+type SheetSummary = {
+  id: string;
+  name: string;
+  modifiedTime: string | null;
+  webViewLink: string | null;
+};
 
 /**
  * Sheet picker: tries to list the user's spreadsheets via /api/google/sheets
@@ -405,7 +427,13 @@ type SheetSummary = { id: string; name: string; modifiedTime: string | null; web
  * missing scope, network error) we gracefully fall back to a manual ID field
  * so existing users aren't locked out of linking a sheet.
  */
-function SheetPicker({ value, onChange }: { value: string; onChange: (id: string | null) => void }) {
+function SheetPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (id: string | null) => void;
+}) {
   const [sheets, setSheets] = useState<SheetSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -452,7 +480,9 @@ function SheetPicker({ value, onChange }: { value: string; onChange: (id: string
 
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Sheet</label>
+      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        Sheet
+      </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value || null)}
@@ -557,7 +587,10 @@ function RuleEditor({
               value={String(rule.value)}
               onChange={(e) => {
                 const asNum = Number(e.target.value);
-                onChange({ ...rule, value: Number.isFinite(asNum) && e.target.value !== '' ? asNum : e.target.value });
+                onChange({
+                  ...rule,
+                  value: Number.isFinite(asNum) && e.target.value !== '' ? asNum : e.target.value,
+                });
               }}
               placeholder="value"
               className="w-28 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"

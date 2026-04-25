@@ -16,7 +16,9 @@ export function validate<T>(schema: ZodType<T>, source: Source = 'body') {
     const input = req[source];
     const result = schema.safeParse(input);
     if (!result.success) {
-      res.status(400).json(fail('VALIDATION_ERROR', 'Invalid request', formatZodError(result.error)));
+      res
+        .status(400)
+        .json(fail('VALIDATION_ERROR', 'Invalid request', formatZodError(result.error)));
       return;
     }
     // Replace the source with parsed+coerced data so handlers get typed values.

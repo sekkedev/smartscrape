@@ -65,7 +65,8 @@ function buildUser(args: ExtractArgs, strictify = false): string {
     args.cleanedHtml,
     DATA_BOUNDARY,
     '',
-    'Respond with ONLY a valid JSON array. No markdown, no explanation, no commentary.' + strictReminder,
+    'Respond with ONLY a valid JSON array. No markdown, no explanation, no commentary.' +
+      strictReminder,
   ].join('\n');
 }
 

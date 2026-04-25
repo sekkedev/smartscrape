@@ -23,10 +23,7 @@ function transporter(): Transporter | null {
     host: env.smtp.host,
     port: env.smtp.port,
     secure: env.smtp.port === 465,
-    auth:
-      env.smtp.user && env.smtp.pass
-        ? { user: env.smtp.user, pass: env.smtp.pass }
-        : undefined,
+    auth: env.smtp.user && env.smtp.pass ? { user: env.smtp.user, pass: env.smtp.pass } : undefined,
   });
   return cached;
 }
