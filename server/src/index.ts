@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { env, requireSecrets } from './config/env.js';
 import { closeDatabase } from './config/database.js';
 import { closeRedis } from './config/redis.js';
@@ -43,6 +44,7 @@ app.use(
 );
 
 app.use(express.json({ limit: '1mb' }));
+app.use(cookieParser());
 
 // Health stays outside the rate limiter so uptime probes never 429.
 app.use('/api/health', healthRouter);

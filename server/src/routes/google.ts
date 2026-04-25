@@ -7,12 +7,17 @@ import { z } from 'zod';
 import {
   buildAuthUrl,
   exchangeAndStore,
+  hashesEqual,
+  hashNonce,
   isConfigured,
   listSheets,
   revokeConnection,
   verifyState,
 } from '../services/google-sheets.js';
 import { validate } from '../middleware/validate.js';
+
+const NONCE_COOKIE = 'ss_google_oauth_nonce';
+const NONCE_COOKIE_MAX_AGE_MS = 10 * 60 * 1000; // matches state expiry
 
 export const googleRouter = Router();
 
@@ -34,7 +39,17 @@ googleRouter.get('/connect', requireAuth, (req, res) => {
     return;
   }
   try {
-    const url = buildAuthUrl(req.user!.id);
+    const { url, nonce } = buildAuthUrl(req.user!.id);
+    // Bind the OAuth flow to THIS browser. Without this, a signed state alone
+    // is a bearer token any attacker can mint → CSRF token-substitution.
+    res.cookie(NONCE_COOKIE, nonce, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: env.nodeEnv === 'production',
+      maxAge: NONCE_COOKIE_MAX_AGE_MS,
+      // Path scoped to the callback so the cookie isn't sent to unrelated routes.
+      path: '/api/google',
+    });
     res.status(200).json(ok({ url }));
   } catch (err) {
     res.status(500).json(fail('INTERNAL_ERROR', err instanceof Error ? err.message : 'Unknown error'));
@@ -64,6 +79,18 @@ googleRouter.get('/callback', async (req, res) => {
     res.redirect(`${clientBase}/settings?google_error=${encodeURIComponent(st.error)}`);
     return;
   }
+  // The nonce cookie set by /connect must match the hash baked into state.
+  // Same-browser-only invariant — defeats the token-substitution CSRF where an
+  // attacker tries to bind their state to a victim's Google grant.
+  const cookies = (req as unknown as { cookies?: Record<string, string> }).cookies ?? {};
+  const cookieNonce = cookies[NONCE_COOKIE];
+  if (!cookieNonce || !hashesEqual(hashNonce(cookieNonce), st.nonceHash)) {
+    res.clearCookie(NONCE_COOKIE, { path: '/api/google' });
+    res.redirect(`${clientBase}/settings?google_error=state_mismatch`);
+    return;
+  }
+  // One-shot: clear immediately so the cookie can't be replayed.
+  res.clearCookie(NONCE_COOKIE, { path: '/api/google' });
   try {
     await exchangeAndStore(st.userId, code);
     res.redirect(`${clientBase}/settings?google_connected=1`);

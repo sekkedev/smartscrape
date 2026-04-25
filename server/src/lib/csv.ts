@@ -25,9 +25,15 @@ export function toCsv(rows: Record<string, unknown>[], opts: { peek?: number } =
   return lines.join('\r\n') + '\r\n';
 }
 
+// Cells starting with these characters are interpreted as formulas by Excel
+// and Google Sheets. Scraped data is untrusted, so we prefix with a literal
+// apostrophe — the de facto neutralization that survives CSV import.
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
 function csvField(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const s = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  let s = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  if (FORMULA_LEAD.test(s)) s = `'${s}`;
   if (/[",\r\n]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }

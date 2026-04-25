@@ -38,34 +38,65 @@ function oauthClient() {
   return new google.auth.OAuth2(c.id, c.secret, c.redirect);
 }
 
+import { randomBytes, createHash } from 'node:crypto';
+
 /**
- * Build the OAuth consent URL. State carries a short-lived signed token so the
- * callback can recover the initiating userId without session cookies.
+ * State payload. We carry the userId AND a binding nonce. The matching nonce
+ * is set on the initiating browser as an httpOnly SameSite=Lax cookie; the
+ * callback rejects the request unless the cookie matches.
+ *
+ * Without the cookie binding, an attacker can mint a state for `sub: A`, hand
+ * the URL to victim V, and have V's Google tokens land on A's row.
  */
-export function buildAuthUrl(userId: string): string {
+export type AuthUrl = { url: string; nonce: string };
+
+export function buildAuthUrl(userId: string): AuthUrl {
   const { jwtAccessSecret } = requireSecrets();
-  const state = jwt.sign({ sub: userId }, jwtAccessSecret, { expiresIn: '10m' });
-  return oauthClient().generateAuthUrl({
+  // 32 bytes of CSPRNG → cookie value (raw); state carries only the hash so
+  // a leaked state can't be replayed without the cookie.
+  const nonce = randomBytes(32).toString('hex');
+  const nonceHash = createHash('sha256').update(nonce).digest('hex');
+  const state = jwt.sign({ sub: userId, nh: nonceHash }, jwtAccessSecret, { expiresIn: '10m' });
+  const url = oauthClient().generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent', // force refresh_token on re-auth
     scope: SHEETS_SCOPES,
     state,
   });
+  return { url, nonce };
 }
 
-export type StateVerify = { ok: true; userId: string } | { ok: false; error: string };
+export type StateVerify =
+  | { ok: true; userId: string; nonceHash: string }
+  | { ok: false; error: string };
 
 export function verifyState(state: string): StateVerify {
   try {
     const { jwtAccessSecret } = requireSecrets();
     const payload = jwt.verify(state, jwtAccessSecret);
-    if (typeof payload !== 'object' || !payload || !('sub' in payload)) {
+    if (typeof payload !== 'object' || !payload || !('sub' in payload) || !('nh' in payload)) {
       return { ok: false, error: 'Invalid state' };
     }
-    return { ok: true, userId: String((payload as { sub: unknown }).sub) };
+    return {
+      ok: true,
+      userId: String((payload as { sub: unknown }).sub),
+      nonceHash: String((payload as { nh: unknown }).nh),
+    };
   } catch {
     return { ok: false, error: 'Invalid or expired state' };
   }
+}
+
+/** Constant-time hex comparison to keep nonce check timing-safe. */
+export function hashesEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+export function hashNonce(nonce: string): string {
+  return createHash('sha256').update(nonce).digest('hex');
 }
 
 /** Exchange a callback code for tokens + the connected email, then persist. */
