@@ -43,6 +43,7 @@ export type JobRow = {
   google_sheet_id: string | null;
   sheet_tab_name: string | null;
   setup_method: SetupMethod;
+  respect_robots_txt: boolean;
   last_run_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -79,6 +80,7 @@ export type CreateJobArgs = {
   google_sheet_id?: string | null;
   sheet_tab_name?: string | null;
   setup_method?: SetupMethod;
+  respect_robots_txt?: boolean;
 };
 
 export async function createJob(userId: string, args: CreateJobArgs): Promise<JobRow> {
@@ -86,9 +88,10 @@ export async function createJob(userId: string, args: CreateJobArgs): Promise<Jo
     `INSERT INTO scrape_jobs (
        user_id, name, urls, extraction_prompt, extraction_schema,
        scrape_method, schedule, enabled, notification_rules, notify_channels,
-       comparison_key, ai_provider, ai_model, google_sheet_id, sheet_tab_name, setup_method
+       comparison_key, ai_provider, ai_model, google_sheet_id, sheet_tab_name, setup_method,
+       respect_robots_txt
      )
-     VALUES ($1,$2,$3::jsonb,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16)
+     VALUES ($1,$2,$3::jsonb,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16,$17)
      RETURNING *`,
     [
       userId,
@@ -107,6 +110,7 @@ export async function createJob(userId: string, args: CreateJobArgs): Promise<Jo
       args.google_sheet_id ?? null,
       args.sheet_tab_name ?? null,
       args.setup_method ?? 'manual',
+      args.respect_robots_txt ?? true,
     ],
   );
   return rows[0]!;
@@ -202,6 +206,7 @@ export async function updateJob(userId: string, jobId: string, args: UpdateJobAr
   if (args.ai_model !== undefined) push('ai_model', args.ai_model);
   if (args.google_sheet_id !== undefined) push('google_sheet_id', args.google_sheet_id);
   if (args.sheet_tab_name !== undefined) push('sheet_tab_name', args.sheet_tab_name);
+  if (args.respect_robots_txt !== undefined) push('respect_robots_txt', args.respect_robots_txt);
 
   if (sets.length === 0) return findJob(userId, jobId);
 

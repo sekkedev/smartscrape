@@ -85,7 +85,9 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
 
   try {
     for (const url of job.urls) {
-      const page = await scrape(url, job.scrape_method);
+      const page = await scrape(url, job.scrape_method, {
+        respectRobotsTxt: job.respect_robots_txt,
+      });
       urlsScraped += 1;
 
       await updateRun(run.id, { status: 'extracting', urls_scraped: urlsScraped });

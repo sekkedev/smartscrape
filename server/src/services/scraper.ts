@@ -1,6 +1,7 @@
 import { chromium, type Browser } from 'playwright';
 import { cleanHtml, visibleTextLength } from './html-cleaner.js';
 import { assertSafeUrl } from '../lib/ssrf.js';
+import { isAllowedByRobots } from './robots.js';
 
 const USER_AGENT = 'SmartScrapeBot/0.1 (+https://github.com/9ny4/smartscrape)';
 // A realistic Chrome UA used on the Playwright fallback path where we want to
@@ -216,10 +217,27 @@ async function fetchViaPlaywrightWithRetry(
   }
 }
 
-export async function scrape(url: string, method: ScrapeMethod = 'auto'): Promise<ScrapeResult> {
+export type ScrapeOptions = {
+  /** When true (default) we honor robots.txt for the configured user-agent. */
+  respectRobotsTxt?: boolean;
+};
+
+export async function scrape(
+  url: string,
+  method: ScrapeMethod = 'auto',
+  opts: ScrapeOptions = {},
+): Promise<ScrapeResult> {
   const safety = await assertSafeUrl(url);
   if (!safety.ok) {
     throw new Error(`Refused to scrape ${url}: ${safety.reason}`);
+  }
+  if (opts.respectRobotsTxt !== false) {
+    const allowed = await isAllowedByRobots(url, USER_AGENT);
+    if (!allowed) {
+      throw new Error(
+        `robots.txt disallows ${USER_AGENT} for ${url}. Set "Respect robots.txt" to off on this job to override.`,
+      );
+    }
   }
   const started = Date.now();
   const host = new URL(url).hostname;

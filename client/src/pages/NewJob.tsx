@@ -81,6 +81,7 @@ export default function NewJob() {
       ai_model: model,
       google_sheet_id: null,
       sheet_tab_name: null,
+      respect_robots_txt: true,
     });
     setStep('review');
   }

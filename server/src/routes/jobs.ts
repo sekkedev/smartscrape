@@ -103,6 +103,7 @@ const createBody = z.object({
   google_sheet_id: z.string().nullable().optional(),
   sheet_tab_name: z.string().nullable().optional(),
   setup_method: setupMethodEnum.optional(),
+  respect_robots_txt: z.boolean().optional(),
 });
 
 const updateBody = createBody.partial();
