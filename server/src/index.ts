@@ -32,16 +32,30 @@ app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false 
 
 // CORS is locked to APP_URL. Server-to-server callers (no Origin header) and
 // the Google OAuth redirect (same-origin to API) are allowed through.
+// `cb(null, false)` blocks without throwing — the disallowed-origin response
+// is handled below as a clean 403 with our standard envelope.
 app.use(
   cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
       if (origin === env.appUrl) return cb(null, true);
-      return cb(new Error(`CORS: origin not allowed: ${origin}`));
+      return cb(null, false);
     },
     credentials: true,
   }),
 );
+
+// Explicit reject for cross-origin requests so the client gets a 403 with the
+// standard envelope instead of a CORS-failed fetch the browser can't surface.
+// Same-origin requests have no Origin header and skip this entirely.
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && origin !== env.appUrl) {
+    res.status(403).json(fail('CORS_FORBIDDEN', `Origin not allowed: ${origin}`));
+    return;
+  }
+  next();
+});
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
