@@ -19,6 +19,18 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Audit dependencies (moderate+)
+        run: npm audit --workspaces --audit-level=moderate
+
   migrations:
     runs-on: ubuntu-latest
     services:
@@ -48,8 +60,84 @@ jobs:
         run: npm run migrate:up --workspace server
       - name: Migrations down (reverse each migration)
         run: |
-          for _ in 1 2 3 4; do
+          MIGRATIONS=$(ls server/migrations/*.js | wc -l)
+          for _ in $(seq 1 $MIGRATIONS); do
             npm run migrate:down --workspace server
           done
       - name: Re-apply migrations
         run: npm run migrate:up --workspace server
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: smartscrape
+          POSTGRES_PASSWORD: smartscrape
+          POSTGRES_DB: smartscrape
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U smartscrape -d smartscrape"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://smartscrape:smartscrape@localhost:5432/smartscrape
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-test-jwt-secret-1234567890abcdef1234567890abcdef1234567890abcdef
+      JWT_REFRESH_SECRET: ci-test-jwt-refresh-1234567890abcdef1234567890abcdef1234567890abcdef
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      APP_URL: http://localhost:5173
+      API_URL: http://localhost:3000
+      PORT: '3000'
+      NODE_ENV: development
+      SKIP_RATE_LIMIT: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      - run: npm run migrate:up --workspace server
+      - name: Start API server
+        run: npm run dev --workspace server &
+      - name: Start client dev server
+        run: npm run dev --workspace client &
+      - name: Wait for API + client
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health > /dev/null && curl -sf http://localhost:5173 > /dev/null; then
+              echo "ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "servers did not come up"
+          exit 1
+      - name: Playwright smoke
+        run: npm run test:e2e --workspace client
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: client/playwright-report/
+          retention-days: 7
