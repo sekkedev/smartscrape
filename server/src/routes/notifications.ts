@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { fail, ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { userGeneralLimiter } from '../middleware/rateLimit.js';
 import { findUserById } from '../db/users.js';
 import { listNotifications } from '../db/notifications.js';
 import { sendEmail } from '../services/email.js';
@@ -10,6 +11,7 @@ import { sendTelegram, getBotSetupInfo } from '../services/telegram.js';
 
 export const notificationsRouter = Router();
 notificationsRouter.use(requireAuth);
+notificationsRouter.use(userGeneralLimiter);
 
 const listQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),

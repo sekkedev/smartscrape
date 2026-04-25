@@ -5,6 +5,7 @@ import { deleteForUser, findForUser, listByUser, PROVIDERS, upsertForUser } from
 import { fail, ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { userGeneralLimiter } from '../middleware/rateLimit.js';
 import { testCredentials } from '../services/ai-providers.js';
 
 export const providersRouter = Router();
@@ -21,6 +22,7 @@ const providerParams = z.object({
 });
 
 providersRouter.use(requireAuth);
+providersRouter.use(userGeneralLimiter);
 
 providersRouter.get('/', async (req, res) => {
   const rows = await listByUser(req.user!.id);

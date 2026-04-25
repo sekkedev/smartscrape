@@ -3,11 +3,13 @@ import { z } from 'zod';
 import { fail, ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { userGeneralLimiter } from '../middleware/rateLimit.js';
 import { findRun, listDataForRun, toDTO as toRunDTO } from '../db/runs.js';
 import { diffRun } from '../services/change-detector.js';
 
 export const runsRouter = Router();
 runsRouter.use(requireAuth);
+runsRouter.use(userGeneralLimiter);
 
 const idParam = z.object({ id: z.string().uuid() });
 

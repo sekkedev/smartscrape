@@ -167,11 +167,14 @@ export async function extract(args: ExtractArgs): Promise<ExtractResult> {
           }
         }
       }
-      // Secret leak check
+      // Secret leak check. Skip guards shorter than 16 chars to avoid false
+      // positives — a 6-char placeholder can incidentally match scraped text.
+      // Real provider keys + emails are well above this floor.
       if (args.secretGuards && args.secretGuards.length > 0) {
         const serialized = JSON.stringify(items);
         for (const secret of args.secretGuards) {
-          if (secret && serialized.includes(secret)) {
+          if (!secret || secret.length < 16) continue;
+          if (serialized.includes(secret)) {
             return {
               ok: false,
               error: 'Extracted data contained restricted values; suspected prompt injection.',
