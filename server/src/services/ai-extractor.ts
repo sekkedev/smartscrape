@@ -135,6 +135,70 @@ export function hashItem(item: unknown): string {
   return createHash('sha256').update(JSON.stringify(item)).digest('hex');
 }
 
+export type ValidateOptions = {
+  extractionSchema?: ExtractionSchema;
+  apiKeyGuards?: string[];
+  emailGuards?: string[];
+  sizeCap: number;
+};
+
+export type ValidateResult =
+  | { ok: true; items: Record<string, unknown>[] }
+  | { ok: false; error: string };
+
+/**
+ * Pure (no I/O) validation pass over a parsed AI response. Splitting this
+ * out of `extract` lets us unit-test the security-critical paths — schema
+ * mismatch, secret-leak, item-size cap — without making real model calls.
+ */
+export function validateExtractedItems(
+  items: Record<string, unknown>[],
+  opts: ValidateOptions,
+): ValidateResult {
+  // Schema type check
+  if (opts.extractionSchema) {
+    for (const item of items) {
+      for (const [field, t] of Object.entries(opts.extractionSchema)) {
+        if (!typeMatches(item[field], t)) {
+          return { ok: false, error: `Field "${field}" has the wrong type (expected ${t})` };
+        }
+      }
+    }
+  }
+
+  // Secret leak check. API keys are length-floored (16 chars) to avoid
+  // false-positive matches on short placeholders; emails skip the floor
+  // because the @-and-dot pattern keeps false-positive risk near zero.
+  const guards: string[] = [];
+  for (const k of opts.apiKeyGuards ?? []) {
+    if (k && k.length >= API_KEY_GUARD_MIN_LENGTH) guards.push(k);
+  }
+  for (const e of opts.emailGuards ?? []) {
+    if (e) guards.push(e);
+  }
+  if (guards.length > 0) {
+    const serialized = JSON.stringify(items);
+    for (const secret of guards) {
+      if (serialized.includes(secret)) {
+        return {
+          ok: false,
+          error: 'Extracted data contained restricted values; suspected prompt injection.',
+        };
+      }
+    }
+  }
+
+  // Size cap
+  for (const item of items) {
+    if (JSON.stringify(item).length > opts.sizeCap) {
+      return { ok: false, error: `Extracted item exceeds size cap of ${opts.sizeCap} bytes` };
+    }
+  }
+
+  const cleanItems = items.map((i) => sanitize(i) as Record<string, unknown>);
+  return { ok: true, items: cleanItems };
+}
+
 export async function extract(args: ExtractArgs): Promise<ExtractResult> {
   const sizeCap = args.itemSizeCap ?? 16_384;
   const messages: ChatMessage[] = [
@@ -165,57 +229,16 @@ export async function extract(args: ExtractArgs): Promise<ExtractResult> {
 
     const items = parseItems(rawText);
     if (items !== null) {
-      // Schema type check
-      if (args.extractionSchema) {
-        for (const item of items) {
-          for (const [field, t] of Object.entries(args.extractionSchema)) {
-            if (!typeMatches(item[field], t)) {
-              return {
-                ok: false,
-                error: `Field "${field}" has the wrong type (expected ${t})`,
-                usage,
-                rawText,
-              };
-            }
-          }
-        }
+      const validated = validateExtractedItems(items, {
+        extractionSchema: args.extractionSchema,
+        apiKeyGuards: args.apiKeyGuards,
+        emailGuards: args.emailGuards,
+        sizeCap,
+      });
+      if (!validated.ok) {
+        return { ok: false, error: validated.error, usage, rawText };
       }
-      // Secret leak check. API keys are length-floored (16) to avoid
-      // false-positive matches on short placeholders; emails are not floored
-      // because the @-and-dot pattern keeps false-positive risk near zero.
-      const guards: string[] = [];
-      for (const k of args.apiKeyGuards ?? []) {
-        if (k && k.length >= API_KEY_GUARD_MIN_LENGTH) guards.push(k);
-      }
-      for (const e of args.emailGuards ?? []) {
-        if (e) guards.push(e);
-      }
-      if (guards.length > 0) {
-        const serialized = JSON.stringify(items);
-        for (const secret of guards) {
-          if (serialized.includes(secret)) {
-            return {
-              ok: false,
-              error: 'Extracted data contained restricted values; suspected prompt injection.',
-              usage,
-              rawText,
-            };
-          }
-        }
-      }
-      // Size cap
-      for (const item of items) {
-        if (JSON.stringify(item).length > sizeCap) {
-          return {
-            ok: false,
-            error: `Extracted item exceeds size cap of ${sizeCap} bytes`,
-            usage,
-            rawText,
-          };
-        }
-      }
-      const cleanItems = items.map((i) => sanitize(i) as Record<string, unknown>);
-      return { ok: true, items: cleanItems, usage: usage!, rawText };
+      return { ok: true, items: validated.items, usage: usage!, rawText };
     }
 
     // Retry once with stricter instructions if the first parse failed.
