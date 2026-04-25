@@ -84,7 +84,10 @@ export function cleanHtml(html: string, opts: CleanOptions = {}): string {
   let workingHtml: string;
   const mains = $('main');
   if (mains.length > 0) {
-    workingHtml = mains.map((_, el) => $.html(el)).get().join('\n');
+    workingHtml = mains
+      .map((_, el) => $.html(el))
+      .get()
+      .join('\n');
   } else {
     workingHtml = $('body').length ? $.html($('body')) : $.html();
   }

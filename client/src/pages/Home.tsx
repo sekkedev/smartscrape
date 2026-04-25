@@ -80,8 +80,13 @@ export default function Home() {
 
         <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-3 flex items-end justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Recent activity</h2>
-            <Link to="/jobs" className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Recent activity
+            </h2>
+            <Link
+              to="/jobs"
+              className="text-xs text-indigo-600 hover:underline dark:text-indigo-400"
+            >
               All jobs
             </Link>
           </div>
@@ -89,7 +94,11 @@ export default function Home() {
             <p className="text-sm text-gray-500">Loading…</p>
           ) : activity.length === 0 ? (
             <p className="text-sm text-gray-500">
-              No runs yet. <Link to="/jobs/new" className="text-indigo-600 hover:underline">Create your first job</Link>.
+              No runs yet.{' '}
+              <Link to="/jobs/new" className="text-indigo-600 hover:underline">
+                Create your first job
+              </Link>
+              .
             </p>
           ) : (
             <table className="min-w-full text-sm">
@@ -115,7 +124,9 @@ export default function Home() {
                     </td>
                     <td className="py-2 font-mono text-xs">{r.items_extracted}</td>
                     <td className="py-2 font-mono text-xs">{r.tokens_used.toLocaleString()}</td>
-                    <td className="py-2 font-mono text-xs text-gray-500">{new Date(r.started_at).toLocaleString()}</td>
+                    <td className="py-2 font-mono text-xs text-gray-500">
+                      {new Date(r.started_at).toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -124,7 +135,9 @@ export default function Home() {
         </section>
 
         <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">AI usage (last 30 days)</h2>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            AI usage (last 30 days)
+          </h2>
           {usage === null ? (
             <p className="text-sm text-gray-500">Loading…</p>
           ) : (
@@ -157,7 +170,9 @@ function StatusBadge({ status }: { status: RunStatus }) {
     failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   };
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${classes[status]}`}>
+    <span
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${classes[status]}`}
+    >
       {status}
     </span>
   );
@@ -208,7 +223,10 @@ function UsageChart({ data }: { data: UsageRow[] }) {
                   return (
                     <div
                       key={p}
-                      style={{ height: `${share}%`, backgroundColor: PROVIDER_COLORS[p] ?? '#9ca3af' }}
+                      style={{
+                        height: `${share}%`,
+                        backgroundColor: PROVIDER_COLORS[p] ?? '#9ca3af',
+                      }}
                       className="w-full first:rounded-t"
                     />
                   );
@@ -224,7 +242,10 @@ function UsageChart({ data }: { data: UsageRow[] }) {
       <div className="mt-3 flex flex-wrap gap-4 text-xs">
         {providers.map((p) => (
           <div key={p} className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-            <span className="inline-block h-2 w-2 rounded" style={{ backgroundColor: PROVIDER_COLORS[p] ?? '#9ca3af' }} />
+            <span
+              className="inline-block h-2 w-2 rounded"
+              style={{ backgroundColor: PROVIDER_COLORS[p] ?? '#9ca3af' }}
+            />
             {p}
           </div>
         ))}

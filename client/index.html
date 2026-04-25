@@ -9,7 +9,11 @@
       (function () {
         try {
           var v = localStorage.getItem('smartscrape-theme') || 'system';
-          var dark = v === 'dark' || (v === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var dark =
+            v === 'dark' ||
+            (v === 'system' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
           if (dark) document.documentElement.classList.add('dark');
         } catch (e) {}
       })();

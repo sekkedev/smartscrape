@@ -114,7 +114,10 @@ export async function updateRun(
   if (patch.completed_at !== undefined) push('completed_at', patch.completed_at);
   if (sets.length === 0) return;
   vals.push(runId);
-  await getPool().query(`UPDATE scrape_runs SET ${sets.join(', ')} WHERE id = $${vals.length}`, vals);
+  await getPool().query(
+    `UPDATE scrape_runs SET ${sets.join(', ')} WHERE id = $${vals.length}`,
+    vals,
+  );
 }
 
 export type ExtractedDataRow = {
@@ -129,10 +132,7 @@ export type ExtractedDataRow = {
 
 export type ExtractedDataDTO = Omit<ExtractedDataRow, 'created_at'> & { created_at: string };
 
-export async function listDataForRun(
-  userId: string,
-  runId: string,
-): Promise<ExtractedDataDTO[]> {
+export async function listDataForRun(userId: string, runId: string): Promise<ExtractedDataDTO[]> {
   const { rows } = await getPool().query<ExtractedDataRow>(
     `SELECT d.*
        FROM extracted_data d

@@ -34,7 +34,9 @@ export default function Jobs() {
   }, [filter, load]);
 
   async function toggle(id: string) {
-    const res = await api<{ job: { enabled: boolean; name: string } }>(`/api/jobs/${id}/toggle`, { method: 'PATCH' });
+    const res = await api<{ job: { enabled: boolean; name: string } }>(`/api/jobs/${id}/toggle`, {
+      method: 'PATCH',
+    });
     if (res.success) {
       toast.info(`${res.data.job.name} ${res.data.job.enabled ? 'enabled' : 'paused'}.`);
     } else {
@@ -49,7 +51,9 @@ export default function Jobs() {
       <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="mb-6 flex items-end justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Jobs</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+              Jobs
+            </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Scrape configurations, their schedules, and most recent runs.
             </p>
@@ -116,7 +120,9 @@ export default function Jobs() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">{job.urls.length}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{job.schedule ?? 'Manual'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      {job.schedule ?? 'Manual'}
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={job.last_run_status} />
                       {job.last_run_at && (
@@ -125,7 +131,9 @@ export default function Jobs() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{job.last_run_items ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      {job.last_run_items ?? '—'}
+                    </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <label className="inline-flex cursor-pointer items-center">
                         <input
@@ -158,7 +166,9 @@ function StatusBadge({ status }: { status: RunStatus | null }) {
     failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   };
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${classes[status]}`}>
+    <span
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${classes[status]}`}
+    >
       {status}
     </span>
   );
@@ -169,7 +179,8 @@ function EmptyState() {
     <div className="rounded-lg border border-dashed border-gray-300 bg-white/60 p-10 text-center dark:border-gray-700 dark:bg-gray-900/40">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">No jobs yet</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-gray-500 dark:text-gray-400">
-        A job watches one or more URLs, extracts structured data with your AI provider, and tells you when things change.
+        A job watches one or more URLs, extracts structured data with your AI provider, and tells
+        you when things change.
       </p>
       <div className="mt-4">
         <Link

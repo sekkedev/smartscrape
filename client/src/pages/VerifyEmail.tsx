@@ -42,7 +42,10 @@ export default function VerifyEmail() {
     <AuthLayout
       title="Verify email"
       footer={
-        <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link
+          to="/login"
+          className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+        >
           Continue to sign in
         </Link>
       }

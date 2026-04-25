@@ -77,11 +77,16 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
       case 'any_change': {
         // One-shot, summary-style rule. OK to fire on the first run ("initial inventory").
         if (diff.added.length > 0 || diff.removed.length > 0 || diff.changed.length > 0) {
-          const url = String((diff.added[0] ?? diff.changed[0]?.after ?? diff.removed[0])?.url ?? '');
+          const url = String(
+            (diff.added[0] ?? diff.changed[0]?.after ?? diff.removed[0])?.url ?? '',
+          );
           out.push({
             type: 'change_detected',
             message: interpolate(
-              rule.message ?? (isFirstRun ? 'First run for {job_name}: {count} items' : 'Data changed on {job_name}'),
+              rule.message ??
+                (isFirstRun
+                  ? 'First run for {job_name}: {count} items'
+                  : 'Data changed on {job_name}'),
               {
                 ...globals,
                 url,
@@ -97,7 +102,10 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
           out.push({
             type: 'change_detected',
             message: interpolate(
-              rule.message ?? (isFirstRun ? 'First run for {job_name}: {count} items' : 'Found {count} new items on {job_name}'),
+              rule.message ??
+                (isFirstRun
+                  ? 'First run for {job_name}: {count} items'
+                  : 'Found {count} new items on {job_name}'),
               {
                 ...globals,
                 count: diff.added.length,
@@ -156,13 +164,16 @@ export function evaluateRules(job: JobRow, diff: DiffResult): EvaluatedNotificat
           if (!match) continue;
           matches.push({
             type: 'change_detected',
-            message: interpolate(rule.message ?? '{job_name}: {field_name} changed from {old} to {new}', {
-              ...globals,
-              field_name: rule.field,
-              old: match.old,
-              new: match.new,
-              url: (ch.after as Record<string, unknown>).url,
-            }),
+            message: interpolate(
+              rule.message ?? '{job_name}: {field_name} changed from {old} to {new}',
+              {
+                ...globals,
+                field_name: rule.field,
+                old: match.old,
+                new: match.new,
+                url: (ch.after as Record<string, unknown>).url,
+              },
+            ),
           });
         }
         out.push(...capPerItem(rule, matches));

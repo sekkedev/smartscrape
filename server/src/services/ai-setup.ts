@@ -81,7 +81,8 @@ function parseObject(raw: string): Record<string, unknown> | null {
 
 function coerceSuggestion(raw: Record<string, unknown>): AiSuggestion | null {
   const name = typeof raw.name === 'string' ? raw.name : null;
-  const extraction_prompt = typeof raw.extraction_prompt === 'string' ? raw.extraction_prompt : null;
+  const extraction_prompt =
+    typeof raw.extraction_prompt === 'string' ? raw.extraction_prompt : null;
   if (!name || !extraction_prompt) return null;
   const schemaRaw = raw.extraction_schema;
   let schema: AiSuggestion['extraction_schema'] = null;
@@ -95,13 +96,24 @@ function coerceSuggestion(raw: Record<string, unknown>): AiSuggestion | null {
     }
     if (Object.keys(tmp).length > 0) schema = tmp;
   }
-  const validRuleTypes = new Set(['any_change', 'new_items', 'removed_items', 'field_threshold', 'field_change']);
+  const validRuleTypes = new Set([
+    'any_change',
+    'new_items',
+    'removed_items',
+    'field_threshold',
+    'field_change',
+  ]);
   const rawRules = Array.isArray(raw.notification_rules) ? raw.notification_rules : [];
   const rules = rawRules
     .map((r) => {
       // Some models return type names as bare strings ("new_items") instead of objects.
       if (typeof r === 'string' && validRuleTypes.has(r)) return { type: r };
-      if (r && typeof r === 'object' && 'type' in r && validRuleTypes.has((r as { type: string }).type)) {
+      if (
+        r &&
+        typeof r === 'object' &&
+        'type' in r &&
+        validRuleTypes.has((r as { type: string }).type)
+      ) {
         return r;
       }
       return null;
@@ -112,7 +124,9 @@ function coerceSuggestion(raw: Record<string, unknown>): AiSuggestion | null {
     extraction_prompt,
     extraction_schema: schema,
     comparison_key:
-      typeof raw.comparison_key === 'string' && raw.comparison_key.length > 0 ? raw.comparison_key : null,
+      typeof raw.comparison_key === 'string' && raw.comparison_key.length > 0
+        ? raw.comparison_key
+        : null,
     notification_rules: rules,
     explanation: typeof raw.explanation === 'string' ? raw.explanation : '',
   };
@@ -133,7 +147,12 @@ export async function suggest(args: SetupArgs): Promise<SetupResult> {
     });
     const obj = parseObject(res.text);
     if (!obj) {
-      return { ok: false, error: 'Model did not return valid JSON', rawText: res.text, usage: res.usage };
+      return {
+        ok: false,
+        error: 'Model did not return valid JSON',
+        rawText: res.text,
+        usage: res.usage,
+      };
     }
     const suggestion = coerceSuggestion(obj);
     if (!suggestion) {

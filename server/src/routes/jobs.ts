@@ -89,9 +89,10 @@ const createBody = z.object({
         return validateCron(v).ok;
       },
       (v) => ({
-        message: v && validateCron(v).ok === false
-          ? (validateCron(v) as { reason: string }).reason
-          : 'Invalid cron',
+        message:
+          v && validateCron(v).ok === false
+            ? (validateCron(v) as { reason: string }).reason
+            : 'Invalid cron',
       }),
     ),
   enabled: z.boolean().optional(),
@@ -151,15 +152,27 @@ const aiConfirmBody = createBody.extend({
 async function resolveProviderKey(
   userId: string,
   provider: ProviderName,
-): Promise<{ ok: true; key: string } | { ok: false; status: number; code: string; message: string }> {
+): Promise<
+  { ok: true; key: string } | { ok: false; status: number; code: string; message: string }
+> {
   const row = await findApiKey(userId, provider);
   if (!row) {
-    return { ok: false, status: 400, code: 'NO_PROVIDER_KEY', message: `No ${provider} key configured. Add one in Settings.` };
+    return {
+      ok: false,
+      status: 400,
+      code: 'NO_PROVIDER_KEY',
+      message: `No ${provider} key configured. Add one in Settings.`,
+    };
   }
   try {
     return { ok: true, key: decrypt(row.api_key_encrypted) };
   } catch {
-    return { ok: false, status: 500, code: 'DECRYPT_FAILED', message: 'Stored key could not be decrypted' };
+    return {
+      ok: false,
+      status: 500,
+      code: 'DECRYPT_FAILED',
+      message: 'Stored key could not be decrypted',
+    };
   }
 }
 
@@ -180,7 +193,9 @@ jobsRouter.post('/ai-setup', aiSetupLimiter, validate(aiSetupBody), async (req, 
   try {
     page = await scrape(body.url);
   } catch (err) {
-    res.status(502).json(fail('SCRAPE_FAILED', err instanceof Error ? err.message : 'Scrape failed'));
+    res
+      .status(502)
+      .json(fail('SCRAPE_FAILED', err instanceof Error ? err.message : 'Scrape failed'));
     return;
   }
   const result = await suggest({
@@ -198,7 +213,12 @@ jobsRouter.post('/ai-setup', aiSetupLimiter, validate(aiSetupBody), async (req, 
     ok({
       suggestion: result.suggestion,
       usage: result.usage,
-      scrape: { method: page.method, status: page.status, finalUrl: page.finalUrl, durationMs: page.durationMs },
+      scrape: {
+        method: page.method,
+        status: page.status,
+        finalUrl: page.finalUrl,
+        durationMs: page.durationMs,
+      },
     }),
   );
 });
@@ -220,7 +240,9 @@ jobsRouter.post('/ai-setup/preview', aiSetupLimiter, validate(aiPreviewBody), as
   try {
     page = await scrape(body.url);
   } catch (err) {
-    res.status(502).json(fail('SCRAPE_FAILED', err instanceof Error ? err.message : 'Scrape failed'));
+    res
+      .status(502)
+      .json(fail('SCRAPE_FAILED', err instanceof Error ? err.message : 'Scrape failed'));
     return;
   }
   const result = await extract({
@@ -279,7 +301,12 @@ jobsRouter.post('/', validate(createBody), async (req, res) => {
     ...body,
     extraction_schema: body.extraction_schema ?? null,
   });
-  await syncSchedule({ jobId: row.id, userId: row.user_id, enabled: row.enabled, schedule: row.schedule });
+  await syncSchedule({
+    jobId: row.id,
+    userId: row.user_id,
+    enabled: row.enabled,
+    schedule: row.schedule,
+  });
   res.status(201).json(ok({ job: toJobDTO(row) }));
 });
 
@@ -308,7 +335,12 @@ jobsRouter.patch('/:id', validate(idParam, 'params'), validate(updateBody), asyn
     res.status(404).json(fail('NOT_FOUND', 'Job not found'));
     return;
   }
-  await syncSchedule({ jobId: row.id, userId: row.user_id, enabled: row.enabled, schedule: row.schedule });
+  await syncSchedule({
+    jobId: row.id,
+    userId: row.user_id,
+    enabled: row.enabled,
+    schedule: row.schedule,
+  });
   res.status(200).json(ok({ job: toJobDTO(row) }));
 });
 
@@ -319,7 +351,12 @@ jobsRouter.patch('/:id/toggle', validate(idParam, 'params'), async (req, res) =>
     res.status(404).json(fail('NOT_FOUND', 'Job not found'));
     return;
   }
-  await syncSchedule({ jobId: row.id, userId: row.user_id, enabled: row.enabled, schedule: row.schedule });
+  await syncSchedule({
+    jobId: row.id,
+    userId: row.user_id,
+    enabled: row.enabled,
+    schedule: row.schedule,
+  });
   res.status(200).json(ok({ job: toJobDTO(row) }));
 });
 
@@ -344,9 +381,14 @@ jobsRouter.post('/:id/run', runTriggerLimiter, validate(idParam, 'params'), asyn
   }
   const recent = await countRunsLast24h(req.user!.id);
   if (recent >= DAILY_RUN_QUOTA) {
-    res.status(429).json(
-      fail('QUOTA_EXCEEDED', `Daily run quota reached (${DAILY_RUN_QUOTA}/24h). Try again later.`),
-    );
+    res
+      .status(429)
+      .json(
+        fail(
+          'QUOTA_EXCEEDED',
+          `Daily run quota reached (${DAILY_RUN_QUOTA}/24h). Try again later.`,
+        ),
+      );
     return;
   }
   const run = await createRun(job.id);
@@ -354,9 +396,17 @@ jobsRouter.post('/:id/run', runTriggerLimiter, validate(idParam, 'params'), asyn
   res.status(202).json(ok({ run: toRunDTO(run) }));
 });
 
-async function sendCsvForRun(res: import('express').Response, jobId: string, runId: string, userId: string, jobName: string): Promise<void> {
+async function sendCsvForRun(
+  res: import('express').Response,
+  jobId: string,
+  runId: string,
+  userId: string,
+  jobName: string,
+): Promise<void> {
   const rows = await listDataForRun(userId, runId);
-  const csv = toCsv(rows.map((r) => ({ source_url: r.source_url, extracted_at: r.created_at, ...r.data })));
+  const csv = toCsv(
+    rows.map((r) => ({ source_url: r.source_url, extracted_at: r.created_at, ...r.data })),
+  );
   const safeName = jobName.replace(/[^a-z0-9_-]+/gi, '_').slice(0, 60) || 'export';
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader(
@@ -400,46 +450,55 @@ jobsRouter.get('/:id/export/csv/:runId', async (req, res) => {
   await sendCsvForRun(res, id, runId, req.user!.id, job.name);
 });
 
-jobsRouter.post('/:id/export/sheets', sheetsPushLimiter, validate(idParam, 'params'), async (req, res) => {
-  const { id } = req.params as unknown as z.infer<typeof idParam>;
-  const job = await findJob(req.user!.id, id);
-  if (!job) {
-    res.status(404).json(fail('NOT_FOUND', 'Job not found'));
-    return;
-  }
-  if (!job.google_sheet_id) {
-    res.status(400).json(fail('NO_SHEET_LINKED', 'This job has no linked Google Sheet'));
-    return;
-  }
-  const conn = await findConnection(req.user!.id);
-  if (!conn) {
-    res.status(400).json(fail('NOT_CONNECTED', 'Google is not connected'));
-    return;
-  }
-  const runs = await listRunsForJob(req.user!.id, id, 1, 0);
-  const latest = runs.find((r) => r.status === 'completed') ?? runs[0];
-  if (!latest) {
-    res.status(404).json(fail('NO_RUNS', 'No runs yet'));
-    return;
-  }
-  const data = await listDataForRun(req.user!.id, latest.id);
-  if (data.length === 0) {
-    res.status(200).json(ok({ appended: 0, runId: latest.id }));
-    return;
-  }
-  try {
-    const result = await pushRows({
-      userId: req.user!.id,
-      sheetId: job.google_sheet_id,
-      tabName: job.sheet_tab_name,
-      rows: data.map((d) => ({ source_url: d.source_url, extracted_at: d.created_at, ...d.data })),
-    });
-    res.status(200).json(ok({ appended: result.appended, runId: latest.id }));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Sheets push failed';
-    res.status(502).json(fail('SHEETS_PUSH_FAILED', message));
-  }
-});
+jobsRouter.post(
+  '/:id/export/sheets',
+  sheetsPushLimiter,
+  validate(idParam, 'params'),
+  async (req, res) => {
+    const { id } = req.params as unknown as z.infer<typeof idParam>;
+    const job = await findJob(req.user!.id, id);
+    if (!job) {
+      res.status(404).json(fail('NOT_FOUND', 'Job not found'));
+      return;
+    }
+    if (!job.google_sheet_id) {
+      res.status(400).json(fail('NO_SHEET_LINKED', 'This job has no linked Google Sheet'));
+      return;
+    }
+    const conn = await findConnection(req.user!.id);
+    if (!conn) {
+      res.status(400).json(fail('NOT_CONNECTED', 'Google is not connected'));
+      return;
+    }
+    const runs = await listRunsForJob(req.user!.id, id, 1, 0);
+    const latest = runs.find((r) => r.status === 'completed') ?? runs[0];
+    if (!latest) {
+      res.status(404).json(fail('NO_RUNS', 'No runs yet'));
+      return;
+    }
+    const data = await listDataForRun(req.user!.id, latest.id);
+    if (data.length === 0) {
+      res.status(200).json(ok({ appended: 0, runId: latest.id }));
+      return;
+    }
+    try {
+      const result = await pushRows({
+        userId: req.user!.id,
+        sheetId: job.google_sheet_id,
+        tabName: job.sheet_tab_name,
+        rows: data.map((d) => ({
+          source_url: d.source_url,
+          extracted_at: d.created_at,
+          ...d.data,
+        })),
+      });
+      res.status(200).json(ok({ appended: result.appended, runId: latest.id }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sheets push failed';
+      res.status(502).json(fail('SHEETS_PUSH_FAILED', message));
+    }
+  },
+);
 
 jobsRouter.get('/:id/runs', validate(idParam, 'params'), async (req, res) => {
   const { id } = req.params as unknown as z.infer<typeof idParam>;

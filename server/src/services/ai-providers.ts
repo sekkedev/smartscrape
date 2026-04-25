@@ -36,7 +36,10 @@ export async function testCredentials(provider: Provider, apiKey: string): Promi
         return {
           ok: false,
           latencyMs: Date.now() - started,
-          error: res.status === 401 || res.status === 403 ? 'Invalid API key' : `${res.status}: ${res.statusText}`,
+          error:
+            res.status === 401 || res.status === 403
+              ? 'Invalid API key'
+              : `${res.status}: ${res.statusText}`,
         };
       }
     }

@@ -55,7 +55,9 @@ export default function Settings() {
       <TopNav />
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Settings</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+            Settings
+          </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Manage AI provider keys and account preferences.
           </p>
@@ -68,7 +70,8 @@ export default function Settings() {
                 AI providers
               </h2>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Keys are encrypted at rest with AES-256-GCM. Smart\u00adScrape never logs or exposes them.
+                Keys are encrypted at rest with AES-256-GCM. Smart\u00adScrape never logs or exposes
+                them.
               </p>
             </div>
           </div>
@@ -105,7 +108,9 @@ export default function Settings() {
         </section>
 
         <section className="mt-12 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Integrations</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Integrations
+          </h2>
           <div className="grid gap-4 md:grid-cols-2">
             <GoogleSheetsCard />
             <TelegramCard />

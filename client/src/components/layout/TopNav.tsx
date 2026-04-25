@@ -12,7 +12,10 @@ export function TopNav() {
     <header className="border-b border-gray-200 bg-white/70 backdrop-blur dark:border-gray-800 dark:bg-gray-950/70">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-6">
-          <Link to="/" className="shrink-0 text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+          <Link
+            to="/"
+            className="shrink-0 text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100"
+          >
             SmartScrape
           </Link>
           <nav className="flex min-w-0 items-center gap-1 overflow-x-auto">

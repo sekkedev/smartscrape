@@ -22,7 +22,7 @@ const NONCE_COOKIE_MAX_AGE_MS = 10 * 60 * 1000; // matches state expiry
 
 export const googleRouter = Router();
 
-googleRouter.get('/status', requireAuth, userGeneralLimiter,async (req, res) => {
+googleRouter.get('/status', requireAuth, userGeneralLimiter, async (req, res) => {
   const conn = await findConnection(req.user!.id);
   res.status(200).json(
     ok({
@@ -34,7 +34,7 @@ googleRouter.get('/status', requireAuth, userGeneralLimiter,async (req, res) => 
   );
 });
 
-googleRouter.get('/connect', requireAuth, userGeneralLimiter,(req, res) => {
+googleRouter.get('/connect', requireAuth, userGeneralLimiter, (req, res) => {
   if (!isConfigured()) {
     res.status(400).json(fail('NOT_CONFIGURED', 'Google OAuth is not configured on this server'));
     return;
@@ -53,7 +53,9 @@ googleRouter.get('/connect', requireAuth, userGeneralLimiter,(req, res) => {
     });
     res.status(200).json(ok({ url }));
   } catch (err) {
-    res.status(500).json(fail('INTERNAL_ERROR', err instanceof Error ? err.message : 'Unknown error'));
+    res
+      .status(500)
+      .json(fail('INTERNAL_ERROR', err instanceof Error ? err.message : 'Unknown error'));
   }
 });
 
@@ -101,7 +103,7 @@ googleRouter.get('/callback', async (req, res) => {
   }
 });
 
-googleRouter.delete('/disconnect', requireAuth, userGeneralLimiter,async (req, res) => {
+googleRouter.delete('/disconnect', requireAuth, userGeneralLimiter, async (req, res) => {
   await revokeConnection(req.user!.id);
   await deleteConnection(req.user!.id);
   res.status(200).json(ok({ disconnected: true }));

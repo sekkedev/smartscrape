@@ -127,7 +127,10 @@ export type JobListItem = JobDTO & {
   last_run_items: number | null;
 };
 
-export async function listJobs(userId: string, opts: ListOpts = {}): Promise<{ items: JobListItem[]; total: number }> {
+export async function listJobs(
+  userId: string,
+  opts: ListOpts = {},
+): Promise<{ items: JobListItem[]; total: number }> {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
   const offset = Math.max(opts.offset ?? 0, 0);
 
@@ -151,10 +154,9 @@ export async function listJobs(userId: string, opts: ListOpts = {}): Promise<{ i
       ${opts.filter === 'failed' ? `AND lr.status = 'failed'` : ''}
       ORDER BY j.created_at DESC
       LIMIT ${limit} OFFSET ${offset}`;
-  const { rows } = await getPool().query<JobRow & { last_run_status: string | null; last_run_items: number | null }>(
-    sql,
-    vals,
-  );
+  const { rows } = await getPool().query<
+    JobRow & { last_run_status: string | null; last_run_items: number | null }
+  >(sql, vals);
   const items = rows.map((r) => ({
     ...toDTO(r),
     last_run_status: r.last_run_status,
@@ -183,7 +185,11 @@ export async function findJob(userId: string, jobId: string): Promise<JobRow | n
 
 export type UpdateJobArgs = Partial<CreateJobArgs>;
 
-export async function updateJob(userId: string, jobId: string, args: UpdateJobArgs): Promise<JobRow | null> {
+export async function updateJob(
+  userId: string,
+  jobId: string,
+  args: UpdateJobArgs,
+): Promise<JobRow | null> {
   // Build dynamic SET clause only for provided keys.
   const sets: string[] = [];
   const vals: unknown[] = [];
@@ -195,12 +201,18 @@ export async function updateJob(userId: string, jobId: string, args: UpdateJobAr
   if (args.urls !== undefined) push('urls', JSON.stringify(args.urls), true);
   if (args.extraction_prompt !== undefined) push('extraction_prompt', args.extraction_prompt);
   if (args.extraction_schema !== undefined)
-    push('extraction_schema', args.extraction_schema ? JSON.stringify(args.extraction_schema) : null, true);
+    push(
+      'extraction_schema',
+      args.extraction_schema ? JSON.stringify(args.extraction_schema) : null,
+      true,
+    );
   if (args.scrape_method !== undefined) push('scrape_method', args.scrape_method);
   if (args.schedule !== undefined) push('schedule', args.schedule);
   if (args.enabled !== undefined) push('enabled', args.enabled);
-  if (args.notification_rules !== undefined) push('notification_rules', JSON.stringify(args.notification_rules), true);
-  if (args.notify_channels !== undefined) push('notify_channels', JSON.stringify(args.notify_channels), true);
+  if (args.notification_rules !== undefined)
+    push('notification_rules', JSON.stringify(args.notification_rules), true);
+  if (args.notify_channels !== undefined)
+    push('notify_channels', JSON.stringify(args.notify_channels), true);
   if (args.comparison_key !== undefined) push('comparison_key', args.comparison_key);
   if (args.ai_provider !== undefined) push('ai_provider', args.ai_provider);
   if (args.ai_model !== undefined) push('ai_model', args.ai_model);

@@ -2,11 +2,7 @@ import { google } from 'googleapis';
 import jwt from 'jsonwebtoken';
 import { requireSecrets } from '../config/env.js';
 import { decrypt, encrypt } from '../config/encryption.js';
-import {
-  findConnection,
-  updateAccessToken,
-  upsertConnection,
-} from '../db/googleConnections.js';
+import { findConnection, updateAccessToken, upsertConnection } from '../db/googleConnections.js';
 
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 export const DRIVE_METADATA_SCOPE = 'https://www.googleapis.com/auth/drive.metadata.readonly';
@@ -100,7 +96,10 @@ export function hashNonce(nonce: string): string {
 }
 
 /** Exchange a callback code for tokens + the connected email, then persist. */
-export async function exchangeAndStore(userId: string, code: string): Promise<{ email: string | null }> {
+export async function exchangeAndStore(
+  userId: string,
+  code: string,
+): Promise<{ email: string | null }> {
   const client = oauthClient();
   const { tokens } = await client.getToken(code);
   if (!tokens.access_token) throw new Error('Google did not return an access token');
@@ -118,7 +117,9 @@ export async function exchangeAndStore(userId: string, code: string): Promise<{ 
     // On re-auth Google omits refresh_token. If we already have one stored, reuse it.
     const existing = await findConnection(userId);
     if (!existing) {
-      throw new Error('Google did not return a refresh_token; revoke app access in your Google account and retry.');
+      throw new Error(
+        'Google did not return a refresh_token; revoke app access in your Google account and retry.',
+      );
     }
     const existingRefresh = decrypt(existing.refresh_token_encrypted);
     tokens.refresh_token = existingRefresh;
@@ -188,9 +189,7 @@ export async function pushRows(args: {
   // write permission. Otherwise the Sheets API returns an opaque 403.
   const conn = await findConnection(args.userId);
   if (conn && conn.scope !== null && !conn.scope.split(/\s+/).includes(SHEETS_SCOPE)) {
-    throw new Error(
-      `Stored Google credentials are missing the Sheets scope. ${RECONNECT_HINT}`,
-    );
+    throw new Error(`Stored Google credentials are missing the Sheets scope. ${RECONNECT_HINT}`);
   }
   const client = await authedClient(args.userId);
   const sheets = google.sheets({ version: 'v4', auth: client });

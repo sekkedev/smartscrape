@@ -38,7 +38,10 @@ test.describe('smoke', () => {
     await page.getByRole('button', { name: 'System', exact: true }).click();
   });
 
-  test('JobForm exposes scrape method + full notification rule palette', async ({ page, sharedSession }) => {
+  test('JobForm exposes scrape method + full notification rule palette', async ({
+    page,
+    sharedSession,
+  }) => {
     await primeAuth(page, sharedSession);
     await page.goto('/jobs/new');
 
@@ -65,7 +68,11 @@ test.describe('smoke', () => {
     );
   });
 
-  test('XSS: script in job name renders as text, never executes', async ({ page, request, sharedSession }) => {
+  test('XSS: script in job name renders as text, never executes', async ({
+    page,
+    request,
+    sharedSession,
+  }) => {
     // React escapes text nodes automatically, but we verify end-to-end. The
     // <img onerror> payload is chosen so any mis-handling would actually run
     // and flip a flag on window.
@@ -75,7 +82,9 @@ test.describe('smoke', () => {
     await primeAuth(page, sharedSession);
     await page.goto('/jobs');
     await page.waitForSelector('text=XSS-E2E');
-    const triggered = await page.evaluate(() => (window as unknown as { __xssTriggered?: boolean }).__xssTriggered);
+    const triggered = await page.evaluate(
+      () => (window as unknown as { __xssTriggered?: boolean }).__xssTriggered,
+    );
     expect(triggered).toBeFalsy();
 
     // If the angle-brackets were rendered as HTML, we'd have an <img> in the DOM.
@@ -83,8 +92,14 @@ test.describe('smoke', () => {
     expect(imgs).toBe(0);
   });
 
-  test('Push to Sheets button: hidden without a sheet, visible with one', async ({ page, request, sharedSession }) => {
-    const jobNoSheet = await createJob(request, sharedSession.accessToken, { name: 'No-sheet job' });
+  test('Push to Sheets button: hidden without a sheet, visible with one', async ({
+    page,
+    request,
+    sharedSession,
+  }) => {
+    const jobNoSheet = await createJob(request, sharedSession.accessToken, {
+      name: 'No-sheet job',
+    });
     const jobWithSheet = await createJob(request, sharedSession.accessToken, {
       name: 'Sheet-linked job',
       google_sheet_id: 'FAKE_SHEET_ID_FOR_VISIBILITY_TEST',
