@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / discussion
+    url: https://github.com/9ny4/smartscrape/discussions
+    about: For open-ended questions, ideas, or showing off how you're using SmartScrape.

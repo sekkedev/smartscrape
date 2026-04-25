@@ -1,5 +1,12 @@
 # SmartScrape
 
+[![CI](https://github.com/9ny4/smartscrape/actions/workflows/ci.yml/badge.svg)](https://github.com/9ny4/smartscrape/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Postgres](https://img.shields.io/badge/Postgres-16-336791?logo=postgresql&logoColor=white)
+
 Self-hosted AI-powered web scraping. Tell it what you want to track in plain English, and it turns any page into structured data, watches for changes, and notifies you by email or Telegram. Bring your own API key from OpenAI, Anthropic, or OpenRouter — SmartScrape never ships with keys or phones home.
 
 ![Home](docs/screenshots/home.png)
@@ -112,6 +119,42 @@ Create an account, add at least one AI provider key under **Settings → AI Prov
 5. Each extracted item is hashed and compared to the previous run using your comparison key to determine added / removed / changed.
 6. Notification rules run against the diff. Email, Telegram, or both — based on the job's `notify_channels` and each rule's trigger.
 7. Data is stored, optionally pushed to Google Sheets, and the run is marked completed.
+
+## Architecture
+
+```
+            ┌──────────────┐
+            │  React SPA   │  Vite + Tailwind, JWT in localStorage
+            │  (port 5173) │
+            └──────┬───────┘
+                   │ /api/* (CORS locked to APP_URL)
+            ┌──────▼───────┐         ┌─────────────────┐
+            │ Express API  │ enqueue │  BullMQ worker  │
+            │  (port 3000) │────────►│ (in same proc)  │
+            └──┬─────────┬─┘         └────────┬────────┘
+               │         │                    │ each tick:
+               │         │                    │   scrape → AI extract →
+               │         │                    │   diff → notify → store
+               │         │                    │
+        ┌──────▼─┐    ┌──▼────┐         ┌────▼─────────┐
+        │Postgres│    │ Redis │         │  AI provider │
+        │   16   │    │   7   │         │  (user key)  │
+        └────────┘    └───────┘         └──────────────┘
+```
+
+**Server (`server/`)** — Express + TypeScript. Auth (bcrypt + JWT + hashed refresh tokens), scrape job CRUD, an AI setup wizard, the runner (BullMQ scheduler + Cheerio/Playwright fetcher + AI extractor + change detector + notifier), and Google Sheets / Telegram / email integrations.
+
+**Client (`client/`)** — React + Vite + Tailwind SPA. Routes for the dashboard, jobs list, job detail with diff view, new-job wizard, settings, and notification history. Talks to `/api` via the Vite dev proxy in development; same-origin in production.
+
+**Database (`server/migrations/`)** — Postgres. Users, refresh tokens, encrypted API keys, scrape jobs, runs, extracted data (with SHA-256 hashes for diffing), notification log, Google connections, settings, AI setup logs.
+
+**Queue** — Redis-backed BullMQ. Manual triggers go through `enqueueNow`; scheduled jobs go through `upsertJobScheduler` keyed per job. The worker runs in the same Node process as the API in v1; splitting it is a one-line change for production.
+
+**Scraping pipeline** — auto mode tries Cheerio first; if visible-text length is below threshold (likely an SPA), it falls back to a headless Chromium context with route interception that aborts requests resolving to private IPs (SSRF defense). HTML is sanitized before reaching the model.
+
+**Extraction pipeline** — provider-agnostic chat call (`ai-providers.ts`) → JSON parse with fence stripping → schema type validation → secret-leak guard (split into floored API keys + unfloored emails) → size cap → HTML-escape sanitize → SHA-256 hash → store. The validator (`validateExtractedItems`) is pure and unit-tested.
+
+**Change detection** — items matched across runs by user-chosen comparison key. New / removed / changed buckets feed the rule engine, which renders templated messages and dispatches via email and/or Telegram.
 
 ## Concepts glossary
 

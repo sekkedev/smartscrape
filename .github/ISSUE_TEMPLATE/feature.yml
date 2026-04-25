@@ -1,0 +1,48 @@
+name: Feature request
+description: A capability that doesn't exist yet, or a meaningful change to one that does.
+title: 'feat: '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Lead with the user pain, not the proposed solution.
+      placeholder: |
+        I want to track stock changes on Amazon listings, but the SSRF guard blocks the redirect chain that Amazon's affiliate links go through.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: Rough sketch is fine. What's the user-facing surface?
+      placeholder: |
+        A per-job allowlist of redirect destination hosts that bypasses the SSRF check.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      placeholder: Disabling SSRF entirely (rejected — too broad).
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What's NOT in this request? Helps avoid gold-plating.
+      placeholder: |
+        Out of scope: a UI for managing the allowlist. Env-var-driven config is fine for v1.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I've searched existing issues and PRs for the same idea.
+          required: true
+        - label: I've checked the README's "v1 does NOT include" list (in HANDOFF spec history) to avoid re-asking for explicitly-deferred features.
+          required: false
