@@ -26,7 +26,7 @@ import { signAccessToken, REFRESH_TTL_MS } from '../lib/jwt.js';
 import { generateToken, hashToken } from '../lib/tokens.js';
 import { fail, ok } from '../lib/response.js';
 import { validate } from '../middleware/validate.js';
-import { authEntryLimiter } from '../middleware/rateLimit.js';
+import { authEntryLimiter, userGeneralLimiter } from '../middleware/rateLimit.js';
 import { requireAuth } from '../middleware/auth.js';
 import { sendEmail } from '../services/email.js';
 
@@ -217,7 +217,7 @@ authRouter.post('/reset-password', validate(resetPasswordSchema), async (req, re
   res.status(200).json(ok({ reset: true }));
 });
 
-authRouter.get('/me', requireAuth, async (req, res) => {
+authRouter.get('/me', requireAuth, userGeneralLimiter, async (req, res) => {
   const user = await findUserById(req.user!.id);
   if (!user) {
     res.status(404).json(fail('NOT_FOUND', 'User not found'));
@@ -226,7 +226,7 @@ authRouter.get('/me', requireAuth, async (req, res) => {
   res.status(200).json(ok({ user: toPublic(user) }));
 });
 
-authRouter.patch('/me', requireAuth, validate(updateProfileSchema), async (req, res) => {
+authRouter.patch('/me', requireAuth, userGeneralLimiter, validate(updateProfileSchema), async (req, res) => {
   const input = req.body as z.infer<typeof updateProfileSchema>;
   const updated = await updateProfile(req.user!.id, {
     name: input.name,
@@ -235,7 +235,7 @@ authRouter.patch('/me', requireAuth, validate(updateProfileSchema), async (req, 
   res.status(200).json(ok({ user: toPublic(updated) }));
 });
 
-authRouter.delete('/me', requireAuth, async (req, res) => {
+authRouter.delete('/me', requireAuth, userGeneralLimiter, async (req, res) => {
   await revokeAllForUser(req.user!.id);
   await deleteUser(req.user!.id);
   res.status(200).json(ok({ deleted: true }));
