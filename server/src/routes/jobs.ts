@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { assertSafeUrl } from '../lib/ssrf.js';
+import { validateCron } from '../lib/cron.js';
 import { fail, ok } from '../lib/response.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -70,7 +71,21 @@ const createBody = z.object({
   extraction_prompt: z.string().trim().min(5).max(5000),
   extraction_schema: extractionSchema.nullable().optional(),
   scrape_method: scrapeMethodEnum.optional(),
-  schedule: z.string().nullable().optional(),
+  schedule: z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (v) => {
+        if (v === null || v === undefined || v === '') return true;
+        return validateCron(v).ok;
+      },
+      (v) => ({
+        message: v && validateCron(v).ok === false
+          ? (validateCron(v) as { reason: string }).reason
+          : 'Invalid cron',
+      }),
+    ),
   enabled: z.boolean().optional(),
   notification_rules: z.array(notificationRule).optional(),
   notify_channels: z.array(channelEnum).optional(),
