@@ -60,17 +60,17 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
     return { runId: run.id, jobId: job.id, status: 'failed', itemsExtracted: 0, tokensUsed: 0, error: err };
   }
 
-  // Build the secret guard list once per run: any value that surfacing in AI
-  // output would suggest a prompt-injection compromise. Includes the user's
-  // email and every stored provider key, regardless of which one is used.
-  const secretGuards: string[] = [];
+  // Build the leak-guard lists once per run. Split by type so the API-key
+  // length floor doesn't disable email detection for short addresses.
+  const apiKeyGuards: string[] = [];
+  const emailGuards: string[] = [];
   const user = await findUserById(job.user_id);
-  if (user?.email) secretGuards.push(user.email);
+  if (user?.email) emailGuards.push(user.email);
   for (const p of PROVIDERS) {
     const row = await findApiKey(job.user_id, p);
     if (!row) continue;
     try {
-      secretGuards.push(decrypt(row.api_key_encrypted));
+      apiKeyGuards.push(decrypt(row.api_key_encrypted));
     } catch {
       // ignore — un-decryptable keys can't leak
     }
@@ -99,7 +99,8 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
         cleanedHtml: page.cleaned,
         extractionPrompt: job.extraction_prompt,
         extractionSchema: job.extraction_schema ?? undefined,
-        secretGuards,
+        apiKeyGuards,
+        emailGuards,
       });
 
       if (!result.ok) {
