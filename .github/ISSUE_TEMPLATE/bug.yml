@@ -1,0 +1,64 @@
+name: Bug report
+description: Something isn't working — a real run failed, the UI broke, an endpoint returned the wrong thing.
+title: 'fix: '
+labels: ['bug']
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Concrete, observable behavior. Skip the speculation about cause.
+      placeholder: |
+        I created a job for https://example.com/products and clicked Run. The run completed in 1.2s with 0 items extracted.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      placeholder: 9 product cards extracted, matching the page.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, copy-pasteable. If a public URL or test page is involved, link it.
+      placeholder: |
+        1. New job, URL = https://example.com/products
+        2. Prompt = "Extract each product card with name and price"
+        3. Click Run
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Run `node --version` and check `git rev-parse HEAD`.
+      placeholder: |
+        - SmartScrape commit: <sha>
+        - Node: 20.x
+        - OS: macOS 14.4 / Ubuntu 22.04 / Windows 11
+        - Browser (if UI bug): Chrome 128
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / error output
+      description: Server stdout, browser console, or the run's `error_message`. Strip secrets first.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I've searched existing issues and PRs for the same bug.
+          required: true
+        - label: I've redacted any API keys / tokens / personal data from logs.
+          required: true
