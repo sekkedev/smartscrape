@@ -79,19 +79,14 @@ app.use((_req, res) => {
 
 // Centralised error handler so uncaught promise rejections in async handlers
 // still return the consistent envelope instead of Express's default HTML.
-app.use(
-  (
-    err: Error,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction,
-  ) => {
-    console.error('[server] unhandled error', err);
-    res
-      .status(500)
-      .json(fail('INTERNAL_ERROR', env.nodeEnv === 'production' ? 'Internal server error' : err.message));
-  },
-);
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[server] unhandled error', err);
+  res
+    .status(500)
+    .json(
+      fail('INTERNAL_ERROR', env.nodeEnv === 'production' ? 'Internal server error' : err.message),
+    );
+});
 
 const server = app.listen(env.port, () => {
   console.log(`[server] listening on http://localhost:${env.port}`);

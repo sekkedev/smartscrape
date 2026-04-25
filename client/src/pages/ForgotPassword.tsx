@@ -34,15 +34,18 @@ export default function ForgotPassword() {
       title="Reset password"
       subtitle="We'll send a reset link if an account exists for this email."
       footer={
-        <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link
+          to="/login"
+          className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+        >
           Back to sign in
         </Link>
       }
     >
       {sent ? (
         <Alert tone="success">
-          If an account matches <span className="font-mono">{email}</span>, a reset link is on its way.
-          The link expires in 1 hour.
+          If an account matches <span className="font-mono">{email}</span>, a reset link is on its
+          way. The link expires in 1 hour.
         </Alert>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">

@@ -53,7 +53,10 @@ export default function Register() {
         title="Check your email"
         subtitle="We sent a verification link to your inbox."
         footer={
-          <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link
+            to="/login"
+            className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+          >
             Continue to sign in
           </Link>
         }
@@ -88,7 +91,10 @@ export default function Register() {
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link
+            to="/login"
+            className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+          >
             Sign in
           </Link>
         </>

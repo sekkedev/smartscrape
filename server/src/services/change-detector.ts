@@ -30,22 +30,18 @@ function fieldLevelDiff(
     const b = after[k];
     // Structural compare for objects/arrays; primitives compared with ===.
     const same =
-      a === b || (typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b));
+      a === b ||
+      (typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b));
     if (!same) out.push({ field: k, old: a, new: b });
   }
   return out;
 }
 
-function indexByKey(
-  rows: DataRow[],
-  comparisonKey: string | null,
-): Map<string, DataRow> {
+function indexByKey(rows: DataRow[], comparisonKey: string | null): Map<string, DataRow> {
   const map = new Map<string, DataRow>();
   for (const r of rows) {
     const key =
-      comparisonKey && r.data[comparisonKey] != null
-        ? String(r.data[comparisonKey])
-        : r.data_hash;
+      comparisonKey && r.data[comparisonKey] != null ? String(r.data[comparisonKey]) : r.data_hash;
     if (!map.has(key)) map.set(key, r);
   }
   return map;

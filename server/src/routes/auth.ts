@@ -40,13 +40,20 @@ const passwordSchema = z
   .max(200, 'Password too long');
 
 const registerSchema = z.object({
-  email: z.string().email().max(254).transform((e) => e.toLowerCase()),
+  email: z
+    .string()
+    .email()
+    .max(254)
+    .transform((e) => e.toLowerCase()),
   password: passwordSchema,
   name: z.string().trim().min(1).max(120).optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email().transform((e) => e.toLowerCase()),
+  email: z
+    .string()
+    .email()
+    .transform((e) => e.toLowerCase()),
   password: z.string().min(1).max(200),
 });
 
@@ -59,7 +66,10 @@ const verifyEmailSchema = z.object({
 });
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email().transform((e) => e.toLowerCase()),
+  email: z
+    .string()
+    .email()
+    .transform((e) => e.toLowerCase()),
 });
 
 const resetPasswordSchema = z.object({
@@ -226,14 +236,20 @@ authRouter.get('/me', requireAuth, userGeneralLimiter, async (req, res) => {
   res.status(200).json(ok({ user: toPublic(user) }));
 });
 
-authRouter.patch('/me', requireAuth, userGeneralLimiter, validate(updateProfileSchema), async (req, res) => {
-  const input = req.body as z.infer<typeof updateProfileSchema>;
-  const updated = await updateProfile(req.user!.id, {
-    name: input.name,
-    telegramChatId: input.telegram_chat_id,
-  });
-  res.status(200).json(ok({ user: toPublic(updated) }));
-});
+authRouter.patch(
+  '/me',
+  requireAuth,
+  userGeneralLimiter,
+  validate(updateProfileSchema),
+  async (req, res) => {
+    const input = req.body as z.infer<typeof updateProfileSchema>;
+    const updated = await updateProfile(req.user!.id, {
+      name: input.name,
+      telegramChatId: input.telegram_chat_id,
+    });
+    res.status(200).json(ok({ user: toPublic(updated) }));
+  },
+);
 
 authRouter.delete('/me', requireAuth, userGeneralLimiter, async (req, res) => {
   await revokeAllForUser(req.user!.id);

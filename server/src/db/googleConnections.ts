@@ -65,9 +65,8 @@ export async function updateAccessToken(
 }
 
 export async function deleteConnection(userId: string): Promise<boolean> {
-  const { rowCount } = await getPool().query(
-    `DELETE FROM google_connections WHERE user_id = $1`,
-    [userId],
-  );
+  const { rowCount } = await getPool().query(`DELETE FROM google_connections WHERE user_id = $1`, [
+    userId,
+  ]);
   return (rowCount ?? 0) > 0;
 }

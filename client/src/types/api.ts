@@ -45,7 +45,13 @@ export type ProviderTestResult = {
 export type ScrapeMethod = 'auto' | 'cheerio' | 'playwright';
 export type SetupMethod = 'ai' | 'manual';
 export type NotifyChannel = 'email' | 'telegram';
-export type RunStatus = 'pending' | 'scraping' | 'extracting' | 'exporting' | 'completed' | 'failed';
+export type RunStatus =
+  | 'pending'
+  | 'scraping'
+  | 'extracting'
+  | 'exporting'
+  | 'completed'
+  | 'failed';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'array' | 'object';
 export type ExtractionSchema = Record<string, FieldType>;

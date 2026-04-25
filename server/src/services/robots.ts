@@ -90,7 +90,9 @@ async function fetchRobots(url: string): Promise<string> {
       }
       chunks.push(value);
     }
-    return Buffer.concat(chunks.map((c) => Buffer.from(c.buffer, c.byteOffset, c.byteLength))).toString('utf8');
+    return Buffer.concat(
+      chunks.map((c) => Buffer.from(c.buffer, c.byteOffset, c.byteLength)),
+    ).toString('utf8');
   } catch {
     return '';
   } finally {

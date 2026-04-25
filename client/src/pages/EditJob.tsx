@@ -40,7 +40,9 @@ export default function EditJob() {
       <TopNav />
       <main className="mx-auto max-w-3xl px-6 py-10">
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Edit job</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+            Edit job
+          </h1>
         </div>
         {initial ? (
           <JobForm

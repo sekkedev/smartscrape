@@ -47,7 +47,9 @@ export default function ResetPassword() {
   if (!token) {
     return (
       <AuthLayout title="Reset password">
-        <Alert tone="error">Missing reset token. Request a new link from the forgot-password page.</Alert>
+        <Alert tone="error">
+          Missing reset token. Request a new link from the forgot-password page.
+        </Alert>
       </AuthLayout>
     );
   }
@@ -56,7 +58,10 @@ export default function ResetPassword() {
     <AuthLayout
       title="Set a new password"
       footer={
-        <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link
+          to="/login"
+          className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+        >
           Back to sign in
         </Link>
       }

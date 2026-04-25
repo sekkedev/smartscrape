@@ -117,9 +117,7 @@ async function fetchWithCap(
  * Without this, a public-looking URL can issue sub-resource requests, follow
  * redirects, or DNS-rebind into the internal network mid-render.
  */
-async function attachSsrfRouteGuard(
-  ctx: import('playwright').BrowserContext,
-): Promise<void> {
+async function attachSsrfRouteGuard(ctx: import('playwright').BrowserContext): Promise<void> {
   await ctx.route('**/*', async (route) => {
     const reqUrl = route.request().url();
     if (reqUrl.startsWith('data:') || reqUrl.startsWith('blob:')) {
@@ -271,7 +269,11 @@ export async function scrape(
       }
     }
     // If Cheerio succeeded but the page looks empty (likely JS-rendered SPA), try Playwright.
-    if (usedMethod === 'cheerio' && method === 'auto' && visibleTextLength(primary!.body) < MIN_VISIBLE_TEXT) {
+    if (
+      usedMethod === 'cheerio' &&
+      method === 'auto' &&
+      visibleTextLength(primary!.body) < MIN_VISIBLE_TEXT
+    ) {
       await throttle(host);
       try {
         primary = await fetchViaPlaywrightWithRetry(url);

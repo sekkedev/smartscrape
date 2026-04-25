@@ -49,7 +49,8 @@ async function seed(): Promise<Session> {
   // Store a provider key so the Settings screenshot shows the connected state.
   // Uses OPENROUTER_DEV_KEY if present, otherwise a placeholder (still renders
   // the "connected" row; test button will show invalid, which is fine).
-  const demoKey = process.env.OPENROUTER_DEV_KEY ?? 'sk-or-v1-demo-placeholder-key-for-screenshot-only';
+  const demoKey =
+    process.env.OPENROUTER_DEV_KEY ?? 'sk-or-v1-demo-placeholder-key-for-screenshot-only';
   await api('/api/providers', {
     method: 'POST',
     token: session.accessToken,
@@ -125,7 +126,10 @@ async function main(): Promise<void> {
 
   const browser = await chromium.launch();
   try {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      deviceScaleFactor: 2,
+    });
     const page = await ctx.newPage();
     await primeAuth(page, session);
 
@@ -137,7 +141,9 @@ async function main(): Promise<void> {
     await shot(page, '/settings', 'settings');
 
     // Job detail (use the first job we seeded)
-    const jobs = await api<{ items: { id: string }[] }>('/api/jobs', { token: session.accessToken });
+    const jobs = await api<{ items: { id: string }[] }>('/api/jobs', {
+      token: session.accessToken,
+    });
     if (jobs.items.length > 0) {
       await shot(page, `/jobs/${jobs.items[0]!.id}`, 'job-detail');
       await shot(page, `/jobs/${jobs.items[0]!.id}/edit`, 'edit-job');
