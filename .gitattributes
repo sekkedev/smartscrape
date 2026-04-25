@@ -1,0 +1,19 @@
+# Normalize text files to LF in the repo, regardless of the contributor's
+# core.autocrlf setting. Prettier/EditorConfig expect LF; without this rule
+# Windows checkouts get CRLF and `npm run format:check` fails locally even
+# though CI is green. Binaries below are explicitly excluded so they don't
+# get text-treated.
+
+* text=auto eol=lf
+
+# Binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.woff  binary
+*.woff2 binary
