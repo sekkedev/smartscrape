@@ -89,14 +89,13 @@ export const test = base.extend<
 export const expect = base.expect;
 
 export async function primeAuth(page: Page, session: Session): Promise<void> {
-  await page.goto('/');
-  await page.evaluate((s) => {
+  await page.addInitScript((s) => {
     localStorage.setItem(
       'smartscrape-auth',
       JSON.stringify({
         state: {
           accessToken: s.accessToken,
-          refreshToken: s.refreshToken,
+          refreshExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
           user: { id: s.userId, email: s.email, name: 'E2E User', email_verified: false },
         },
         version: 0,
