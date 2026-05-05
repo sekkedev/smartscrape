@@ -179,15 +179,13 @@ authRouter.post('/login', authEntryLimiter, validate(loginSchema), async (req, r
   }
   const session = await issueSession({ id: user.id, email: user.email });
   setRefreshCookie(res, session.refreshToken, new Date(session.refreshExpiresAt));
-  res
-    .status(200)
-    .json(
-      ok({
-        user: toPublic(user),
-        accessToken: session.accessToken,
-        refreshExpiresAt: session.refreshExpiresAt,
-      }),
-    );
+  res.status(200).json(
+    ok({
+      user: toPublic(user),
+      accessToken: session.accessToken,
+      refreshExpiresAt: session.refreshExpiresAt,
+    }),
+  );
 });
 
 authRouter.post('/refresh', validate(refreshSchema), async (req, res) => {
