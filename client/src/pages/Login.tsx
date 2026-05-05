@@ -26,6 +26,7 @@ export default function Login() {
       method: 'POST',
       body: { email, password },
       skipAuth: true,
+      // cookie refresh needs credentials on the auth endpoints too
     });
     setLoading(false);
     if (!res.success) {
@@ -34,7 +35,6 @@ export default function Login() {
     }
     setSession({
       accessToken: res.data.accessToken,
-      refreshToken: res.data.refreshToken,
       refreshExpiresAt: res.data.refreshExpiresAt,
     });
     setUser(res.data.user);

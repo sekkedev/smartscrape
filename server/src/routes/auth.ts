@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { env } from '../config/env.js';
+import { refreshCookieOptions } from '../lib/session.js';
 import {
   createUser,
   clearResetToken,
@@ -58,7 +59,7 @@ const loginSchema = z.object({
 });
 
 const refreshSchema = z.object({
-  refreshToken: z.string().min(10),
+  refreshToken: z.string().min(10).optional(),
 });
 
 const verifyEmailSchema = z.object({
@@ -98,6 +99,14 @@ async function issueSession(user: { id: string; email: string }): Promise<{
     refreshToken: token,
     refreshExpiresAt: expiresAt.toISOString(),
   };
+}
+
+function setRefreshCookie(res: import('express').Response, token: string, expiresAt: Date): void {
+  res.cookie('refreshToken', token, refreshCookieOptions(expiresAt));
+}
+
+function clearRefreshCookie(res: import('express').Response): void {
+  res.clearCookie('refreshToken', refreshCookieOptions(new Date(0)));
 }
 
 function verificationUrl(token: string): string {
@@ -169,12 +178,19 @@ authRouter.post('/login', authEntryLimiter, validate(loginSchema), async (req, r
     return;
   }
   const session = await issueSession({ id: user.id, email: user.email });
-  res.status(200).json(ok({ user: toPublic(user), ...session }));
+  setRefreshCookie(res, session.refreshToken, new Date(session.refreshExpiresAt));
+  res.status(200).json(ok({ user: toPublic(user), accessToken: session.accessToken, refreshExpiresAt: session.refreshExpiresAt }));
 });
 
 authRouter.post('/refresh', validate(refreshSchema), async (req, res) => {
   const { refreshToken } = req.body as z.infer<typeof refreshSchema>;
-  const row = await findActiveByHash(hashToken(refreshToken));
+  const cookieToken = req.cookies?.refreshToken;
+  const presentedToken = refreshToken ?? cookieToken;
+  if (!presentedToken) {
+    res.status(401).json(fail('INVALID_REFRESH', 'Refresh token is invalid or expired'));
+    return;
+  }
+  const row = await findActiveByHash(hashToken(presentedToken));
   if (!row) {
     res.status(401).json(fail('INVALID_REFRESH', 'Refresh token is invalid or expired'));
     return;
@@ -187,7 +203,8 @@ authRouter.post('/refresh', validate(refreshSchema), async (req, res) => {
   // Rotate: revoke the presented token, issue a fresh pair.
   await revokeById(row.id);
   const session = await issueSession({ id: user.id, email: user.email });
-  res.status(200).json(ok(session));
+  setRefreshCookie(res, session.refreshToken, new Date(session.refreshExpiresAt));
+  res.status(200).json(ok({ accessToken: session.accessToken, refreshExpiresAt: session.refreshExpiresAt }));
 });
 
 authRouter.post(
@@ -253,6 +270,7 @@ authRouter.patch(
 
 authRouter.delete('/me', requireAuth, userGeneralLimiter, async (req, res) => {
   await revokeAllForUser(req.user!.id);
+  clearRefreshCookie(res);
   await deleteUser(req.user!.id);
   res.status(200).json(ok({ deleted: true }));
 });

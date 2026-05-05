@@ -10,7 +10,6 @@ export type PublicUser = {
 
 export type Session = {
   accessToken: string;
-  refreshToken: string;
   refreshExpiresAt: string;
 };
 

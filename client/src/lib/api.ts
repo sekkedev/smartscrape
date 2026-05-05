@@ -17,15 +17,12 @@ let refreshPromise: Promise<boolean> | null = null;
 
 async function refreshSession(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
-  const { refreshToken } = useAuth.getState();
-  if (!refreshToken) return false;
-
   refreshPromise = (async () => {
     try {
       const res = await fetch('/api/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        credentials: 'include',
       });
       const json = (await res.json()) as ApiResponse<RefreshResponse>;
       if (!json.success) {
@@ -58,6 +55,7 @@ async function doFetch(path: string, opts: RequestOptions): Promise<Response> {
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     signal: opts.signal,
+    credentials: 'include',
   });
 }
 
