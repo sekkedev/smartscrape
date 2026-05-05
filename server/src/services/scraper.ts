@@ -13,6 +13,7 @@ const BROWSER_UA =
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const MIN_VISIBLE_TEXT = 200; // below this, fall back to Playwright
 const PER_HOST_DELAY_MS = 2_000;
+const MAX_PLAYWRIGHT_CONTEXTS = Number(process.env.SCRAPER_MAX_PLAYWRIGHT_CONTEXTS ?? '2');
 
 export type ScrapeMethod = 'auto' | 'cheerio' | 'playwright';
 
@@ -27,6 +28,26 @@ export type ScrapeResult = {
 };
 
 const lastHitAt = new Map<string, number>();
+let activePlaywrightContexts = 0;
+const playwrightQueue: Array<() => void> = [];
+
+async function acquirePlaywrightSlot(): Promise<() => void> {
+  if (activePlaywrightContexts < MAX_PLAYWRIGHT_CONTEXTS) {
+    activePlaywrightContexts++;
+    return () => {
+      activePlaywrightContexts--;
+      const next = playwrightQueue.shift();
+      if (next) next();
+    };
+  }
+  await new Promise<void>((resolve) => playwrightQueue.push(resolve));
+  activePlaywrightContexts++;
+  return () => {
+    activePlaywrightContexts--;
+    const next = playwrightQueue.shift();
+    if (next) next();
+  };
+}
 
 async function throttle(host: string): Promise<void> {
   const last = lastHitAt.get(host) ?? 0;
@@ -170,6 +191,7 @@ async function fetchViaPlaywright(
   url: string,
   http1Only = false,
 ): Promise<{ status: number; body: string; finalUrl: string }> {
+  const release = await acquirePlaywrightSlot();
   const b = await browser(http1Only);
   const ctx = await b.newContext({
     userAgent: BROWSER_UA,
@@ -198,6 +220,7 @@ async function fetchViaPlaywright(
     return { status: response?.status() ?? 0, body, finalUrl: page.url() };
   } finally {
     await ctx.close();
+    release();
   }
 }
 

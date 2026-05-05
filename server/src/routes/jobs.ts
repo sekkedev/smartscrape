@@ -20,7 +20,7 @@ import {
   toggleJob,
   updateJob,
 } from '../db/jobs.js';
-import { countRunsLast24h, listDataForRun, listRunsForJob } from '../db/runs.js';
+import { countRunsLast24h, findRun, listDataForRun, listRunsForJob } from '../db/runs.js';
 import { DAILY_RUN_QUOTA } from '../services/job-runner.js';
 import { toCsv } from '../lib/csv.js';
 import { findForUser as findApiKey, type Provider as ProviderName } from '../db/apiKeys.js';
@@ -403,6 +403,11 @@ async function sendCsvForRun(
   userId: string,
   jobName: string,
 ): Promise<void> {
+  const run = await findRun(userId, runId);
+  if (!run || run.job_id !== jobId) {
+    res.status(404).json(fail('NOT_FOUND', 'Run not found'));
+    return;
+  }
   const rows = await listDataForRun(userId, runId);
   const csv = toCsv(
     rows.map((r) => ({ source_url: r.source_url, extracted_at: r.created_at, ...r.data })),
