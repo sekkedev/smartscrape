@@ -19,6 +19,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test --workspace server
+      - run: npm run test --workspace client
       - run: npm run build
 
   audit:
