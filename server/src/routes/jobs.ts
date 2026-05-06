@@ -419,7 +419,6 @@ async function sendCsvForRun(
     `attachment; filename="${safeName}-${runId.slice(0, 8)}.csv"`,
   );
   res.status(200).send(csv);
-  void jobId;
 }
 
 jobsRouter.get('/:id/export/csv', validate(idParam, 'params'), async (req, res) => {

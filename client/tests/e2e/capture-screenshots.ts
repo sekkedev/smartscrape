@@ -17,7 +17,7 @@ const API_BASE = 'http://localhost:3000';
 const UI_BASE = 'http://localhost:5173';
 const OUT_DIR = resolve(process.cwd(), '..', 'docs', 'screenshots');
 
-type Session = { accessToken: string; refreshToken: string; userId: string; email: string };
+type Session = { accessToken: string; userId: string; email: string };
 
 async function api<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -35,13 +35,12 @@ async function seed(): Promise<Session> {
     method: 'POST',
     body: JSON.stringify({ email, password, name: 'Demo' }),
   });
-  const login = await api<{ accessToken: string; refreshToken: string; user: { id: string } }>(
-    '/api/auth/login',
-    { method: 'POST', body: JSON.stringify({ email, password }) },
-  );
+  const login = await api<{ accessToken: string; user: { id: string } }>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
   const session: Session = {
     accessToken: login.accessToken,
-    refreshToken: login.refreshToken,
     userId: login.user.id,
     email,
   };
@@ -99,7 +98,6 @@ async function primeAuth(page: Page, session: Session): Promise<void> {
       JSON.stringify({
         state: {
           accessToken: s.accessToken,
-          refreshToken: s.refreshToken,
           user: { id: s.userId, email: s.email, name: 'Demo', email_verified: false },
         },
         version: 0,

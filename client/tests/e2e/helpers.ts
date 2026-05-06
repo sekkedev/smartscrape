@@ -6,7 +6,6 @@ export type Session = {
   email: string;
   password: string;
   accessToken: string;
-  refreshToken: string;
   userId: string;
 };
 
@@ -44,13 +43,12 @@ export async function registerAndLogin(request: APIRequestContext): Promise<Sess
     throw new Error(`login failed: ${login.status()} ${await login.text()}`);
   }
   const body = (await login.json()) as {
-    data: { accessToken: string; refreshToken: string; user: { id: string } };
+    data: { accessToken: string; user: { id: string } };
   };
   return {
     email,
     password,
     accessToken: body.data.accessToken,
-    refreshToken: body.data.refreshToken,
     userId: body.data.user.id,
   };
 }
