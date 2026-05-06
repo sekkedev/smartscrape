@@ -58,10 +58,6 @@ const loginSchema = z.object({
   password: z.string().min(1).max(200),
 });
 
-const refreshSchema = z.object({
-  refreshToken: z.string().min(10).optional(),
-});
-
 const verifyEmailSchema = z.object({
   token: z.string().min(10),
 });
@@ -188,10 +184,13 @@ authRouter.post('/login', authEntryLimiter, validate(loginSchema), async (req, r
   );
 });
 
-authRouter.post('/refresh', validate(refreshSchema), async (req, res) => {
-  const { refreshToken } = req.body as z.infer<typeof refreshSchema>;
-  const cookieToken = req.cookies?.refreshToken;
-  const presentedToken = refreshToken ?? cookieToken;
+authRouter.post('/refresh', async (req, res) => {
+  // Cookie-only since the HttpOnly migration in #82. The previous JSON-body
+  // fallback was preserved for backward compatibility but defeated the
+  // migration's point — an XSS-captured token could still be replayed via
+  // body. The current client (`client/src/lib/api.ts`) uses
+  // `credentials: 'include'` and never sends the token in the body.
+  const presentedToken: string | undefined = req.cookies?.refreshToken;
   if (!presentedToken) {
     res.status(401).json(fail('INVALID_REFRESH', 'Refresh token is invalid or expired'));
     return;
@@ -213,6 +212,22 @@ authRouter.post('/refresh', validate(refreshSchema), async (req, res) => {
   res
     .status(200)
     .json(ok({ accessToken: session.accessToken, refreshExpiresAt: session.refreshExpiresAt }));
+});
+
+authRouter.post('/logout', async (req, res) => {
+  // Idempotent: revoke the cookie's refresh token if it maps to an active
+  // row, then always clear the cookie and return 200. We never leak whether
+  // the presented token was valid — every call returns the same shape so
+  // an attacker can't probe token validity through this endpoint.
+  const cookieToken: string | undefined = req.cookies?.refreshToken;
+  if (cookieToken) {
+    const row = await findActiveByHash(hashToken(cookieToken));
+    if (row) {
+      await revokeById(row.id);
+    }
+  }
+  clearRefreshCookie(res);
+  res.status(200).json(ok({ logout: true }));
 });
 
 authRouter.post(
