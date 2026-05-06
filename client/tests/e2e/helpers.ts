@@ -1,4 +1,4 @@
-import { test as base, type APIRequestContext, type Page } from '@playwright/test';
+import { test as base, type APIRequestContext, type Cookie, type Page } from '@playwright/test';
 
 export const API_BASE = 'http://localhost:3000';
 
@@ -6,6 +6,15 @@ export type Session = {
   email: string;
   password: string;
   accessToken: string;
+  /** ISO timestamp from the login response — drives RequireAuth's staleness gate. */
+  refreshExpiresAt: string;
+  /**
+   * Cookies captured from the request context that performed the login,
+   * including the HttpOnly `refreshToken` set by the server. Replayed into
+   * the browser context by `primeAuth` so /api/auth/refresh works in tests
+   * that exercise it.
+   */
+  cookies: Cookie[];
   userId: string;
 };
 
@@ -43,12 +52,18 @@ export async function registerAndLogin(request: APIRequestContext): Promise<Sess
     throw new Error(`login failed: ${login.status()} ${await login.text()}`);
   }
   const body = (await login.json()) as {
-    data: { accessToken: string; user: { id: string } };
+    data: { accessToken: string; refreshExpiresAt: string; user: { id: string } };
   };
+  // Capture the cookies that the request context received from /login —
+  // includes the HttpOnly `refreshToken` we'll replay into the browser
+  // context via primeAuth so /api/auth/refresh works in tests.
+  const storage = await request.storageState();
   return {
     email,
     password,
     accessToken: body.data.accessToken,
+    refreshExpiresAt: body.data.refreshExpiresAt,
+    cookies: storage.cookies,
     userId: body.data.user.id,
   };
 }
@@ -87,13 +102,20 @@ export const test = base.extend<
 export const expect = base.expect;
 
 export async function primeAuth(page: Page, session: Session): Promise<void> {
+  // Replay the real refresh cookie into the browser context. Tests that
+  // exercise /api/auth/refresh now actually have a server-recognized
+  // cookie to send; previously this was missing and a fake 1-hour
+  // refreshExpiresAt was used to dodge RequireAuth's staleness check.
+  if (session.cookies.length > 0) {
+    await page.context().addCookies(session.cookies);
+  }
   await page.addInitScript((s) => {
     localStorage.setItem(
       'smartscrape-auth',
       JSON.stringify({
         state: {
           accessToken: s.accessToken,
-          refreshExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          refreshExpiresAt: s.refreshExpiresAt,
           user: { id: s.userId, email: s.email, name: 'E2E User', email_verified: false },
         },
         version: 0,
