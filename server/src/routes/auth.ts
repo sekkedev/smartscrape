@@ -214,6 +214,22 @@ authRouter.post('/refresh', async (req, res) => {
     .json(ok({ accessToken: session.accessToken, refreshExpiresAt: session.refreshExpiresAt }));
 });
 
+authRouter.post('/logout', async (req, res) => {
+  // Idempotent: revoke the cookie's refresh token if it maps to an active
+  // row, then always clear the cookie and return 200. We never leak whether
+  // the presented token was valid — every call returns the same shape so
+  // an attacker can't probe token validity through this endpoint.
+  const cookieToken: string | undefined = req.cookies?.refreshToken;
+  if (cookieToken) {
+    const row = await findActiveByHash(hashToken(cookieToken));
+    if (row) {
+      await revokeById(row.id);
+    }
+  }
+  clearRefreshCookie(res);
+  res.status(200).json(ok({ logout: true }));
+});
+
 authRouter.post(
   '/forgot-password',
   authEntryLimiter,
