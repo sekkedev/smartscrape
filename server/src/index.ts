@@ -19,6 +19,7 @@ import { notificationsRouter } from './routes/notifications.js';
 import { providersRouter } from './routes/providers.js';
 import { runsRouter } from './routes/runs.js';
 import { settingsRouter } from './routes/settings.js';
+import { requireSameSite } from './middleware/csrf.js';
 import { generalLimiter } from './middleware/rateLimit.js';
 import { fail } from './lib/response.js';
 
@@ -48,17 +49,11 @@ app.use(
   }),
 );
 
-// Explicit reject for cross-origin requests so the client gets a 403 with the
-// standard envelope instead of a CORS-failed fetch the browser can't surface.
-// Same-origin requests have no Origin header and skip this entirely.
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && origin !== env.appUrl) {
-    res.status(403).json(fail('CORS_FORBIDDEN', `Origin not allowed: ${origin}`));
-    return;
-  }
-  next();
-});
+// Belt-and-suspenders CSRF guard: short-circuits cross-origin /
+// cross-site requests with 403 *before* the route handler runs. CORS
+// only gates the response from being read; the request still hits the
+// handler and side effects execute. See server/src/middleware/csrf.ts.
+app.use(requireSameSite);
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
