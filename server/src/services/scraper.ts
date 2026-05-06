@@ -1,6 +1,7 @@
 import { chromium, type Browser } from 'playwright';
 import { cleanHtml, visibleTextLength } from './html-cleaner.js';
 import { assertSafeUrl } from '../lib/ssrf.js';
+import { createSemaphore } from '../lib/semaphore.js';
 import { isAllowedByRobots } from './robots.js';
 
 const USER_AGENT = 'SmartScrapeBot/0.1 (+https://github.com/9ny4/smartscrape)';
@@ -13,7 +14,18 @@ const BROWSER_UA =
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const MIN_VISIBLE_TEXT = 200; // below this, fall back to Playwright
 const PER_HOST_DELAY_MS = 2_000;
-const MAX_PLAYWRIGHT_CONTEXTS = Number(process.env.SCRAPER_MAX_PLAYWRIGHT_CONTEXTS ?? '2');
+function readMaxPlaywrightContexts(): number {
+  const raw = process.env.SCRAPER_MAX_PLAYWRIGHT_CONTEXTS;
+  if (raw === undefined || raw === '') return 2;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(
+      `SCRAPER_MAX_PLAYWRIGHT_CONTEXTS must be a positive integer (got ${JSON.stringify(raw)})`,
+    );
+  }
+  return parsed;
+}
+const MAX_PLAYWRIGHT_CONTEXTS = readMaxPlaywrightContexts();
 
 export type ScrapeMethod = 'auto' | 'cheerio' | 'playwright';
 
@@ -28,26 +40,7 @@ export type ScrapeResult = {
 };
 
 const lastHitAt = new Map<string, number>();
-let activePlaywrightContexts = 0;
-const playwrightQueue: Array<() => void> = [];
-
-async function acquirePlaywrightSlot(): Promise<() => void> {
-  if (activePlaywrightContexts < MAX_PLAYWRIGHT_CONTEXTS) {
-    activePlaywrightContexts++;
-    return () => {
-      activePlaywrightContexts--;
-      const next = playwrightQueue.shift();
-      if (next) next();
-    };
-  }
-  await new Promise<void>((resolve) => playwrightQueue.push(resolve));
-  activePlaywrightContexts++;
-  return () => {
-    activePlaywrightContexts--;
-    const next = playwrightQueue.shift();
-    if (next) next();
-  };
-}
+const playwrightSlots = createSemaphore(MAX_PLAYWRIGHT_CONTEXTS);
 
 async function throttle(host: string): Promise<void> {
   const last = lastHitAt.get(host) ?? 0;
@@ -191,7 +184,7 @@ async function fetchViaPlaywright(
   url: string,
   http1Only = false,
 ): Promise<{ status: number; body: string; finalUrl: string }> {
-  const release = await acquirePlaywrightSlot();
+  const release = await playwrightSlots.acquire();
   const b = await browser(http1Only);
   const ctx = await b.newContext({
     userAgent: BROWSER_UA,
