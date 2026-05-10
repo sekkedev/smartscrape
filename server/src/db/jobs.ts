@@ -44,20 +44,37 @@ export type JobRow = {
   sheet_tab_name: string | null;
   setup_method: SetupMethod;
   respect_robots_txt: boolean;
+  webhook_url: string | null;
+  /**
+   * AES-256-GCM ciphertext of the user-supplied HMAC secret, or null. The
+   * plaintext is never returned by the API after the initial write — the DTO
+   * exposes `webhook_secret_configured: boolean` so the UI can show that one
+   * is set without leaking it.
+   */
+  webhook_secret_encrypted: string | null;
   last_run_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
 
-export type JobDTO = Omit<JobRow, 'last_run_at' | 'created_at' | 'updated_at'> & {
+export type JobDTO = Omit<
+  JobRow,
+  'last_run_at' | 'created_at' | 'updated_at' | 'webhook_secret_encrypted'
+> & {
   last_run_at: string | null;
   created_at: string;
   updated_at: string;
+  webhook_secret_configured: boolean;
 };
 
 export function toDTO(row: JobRow): JobDTO {
+  // Strip the encrypted column from the wire shape — callers should only ever
+  // see a boolean. Destructure it off before spreading.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { webhook_secret_encrypted, ...rest } = row;
   return {
-    ...row,
+    ...rest,
+    webhook_secret_configured: row.webhook_secret_encrypted !== null,
     last_run_at: row.last_run_at?.toISOString() ?? null,
     created_at: row.created_at.toISOString(),
     updated_at: row.updated_at.toISOString(),
@@ -81,6 +98,8 @@ export type CreateJobArgs = {
   sheet_tab_name?: string | null;
   setup_method?: SetupMethod;
   respect_robots_txt?: boolean;
+  webhook_url?: string | null;
+  webhook_secret_encrypted?: string | null;
 };
 
 export async function createJob(userId: string, args: CreateJobArgs): Promise<JobRow> {
@@ -89,9 +108,9 @@ export async function createJob(userId: string, args: CreateJobArgs): Promise<Jo
        user_id, name, urls, extraction_prompt, extraction_schema,
        scrape_method, schedule, enabled, notification_rules, notify_channels,
        comparison_key, ai_provider, ai_model, google_sheet_id, sheet_tab_name, setup_method,
-       respect_robots_txt
+       respect_robots_txt, webhook_url, webhook_secret_encrypted
      )
-     VALUES ($1,$2,$3::jsonb,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16,$17)
+     VALUES ($1,$2,$3::jsonb,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      RETURNING *`,
     [
       userId,
@@ -111,6 +130,8 @@ export async function createJob(userId: string, args: CreateJobArgs): Promise<Jo
       args.sheet_tab_name ?? null,
       args.setup_method ?? 'manual',
       args.respect_robots_txt ?? true,
+      args.webhook_url ?? null,
+      args.webhook_secret_encrypted ?? null,
     ],
   );
   return rows[0]!;
@@ -219,6 +240,9 @@ export async function updateJob(
   if (args.google_sheet_id !== undefined) push('google_sheet_id', args.google_sheet_id);
   if (args.sheet_tab_name !== undefined) push('sheet_tab_name', args.sheet_tab_name);
   if (args.respect_robots_txt !== undefined) push('respect_robots_txt', args.respect_robots_txt);
+  if (args.webhook_url !== undefined) push('webhook_url', args.webhook_url);
+  if (args.webhook_secret_encrypted !== undefined)
+    push('webhook_secret_encrypted', args.webhook_secret_encrypted);
 
   if (sets.length === 0) return findJob(userId, jobId);
 

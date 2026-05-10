@@ -38,6 +38,7 @@ export SMARTSCRAPE_TOKEN=eyJhbGciOiJIUzI1NiIs...
 auth login | logout | whoami
 auth tokens list | create --name <n> | revoke <id>
 jobs list | show <id> | create | edit <id> | delete <id> | toggle <id> | run <id>
+jobs webhook test <id>      # send a synthetic payload to the configured URL
 runs show <id> | data <id> | diff <id>
 results <job-id>            # latest run's data
 export <job-id> --csv | --json | --sheets
@@ -46,6 +47,10 @@ providers list | set --provider <p> --key <k> | test <p> | delete <p>
 notifications test email | telegram
 dashboard stats
 ```
+
+Pass `--webhook-url <url>` and `--webhook-secret <secret>` on `jobs create` /
+`jobs edit` to receive POSTed run results. On `jobs edit`, an empty string
+(e.g. `--webhook-url ""`) clears the field.
 
 Every command supports `--json` (raw JSON to stdout) and `--quiet` (suppress
 non-error output), plus `--server-url`, `--token`, and `--api-key` for

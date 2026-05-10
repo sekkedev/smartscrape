@@ -19,11 +19,16 @@ export type RunRow = {
   export_error: string | null;
   started_at: Date;
   completed_at: Date | null;
+  webhook_status: 'success' | 'failed' | null;
+  webhook_attempts: number;
+  webhook_last_error: string | null;
+  webhook_delivered_at: Date | null;
 };
 
-export type RunDTO = Omit<RunRow, 'started_at' | 'completed_at'> & {
+export type RunDTO = Omit<RunRow, 'started_at' | 'completed_at' | 'webhook_delivered_at'> & {
   started_at: string;
   completed_at: string | null;
+  webhook_delivered_at: string | null;
 };
 
 export function toDTO(r: RunRow): RunDTO {
@@ -31,6 +36,7 @@ export function toDTO(r: RunRow): RunDTO {
     ...r,
     started_at: r.started_at.toISOString(),
     completed_at: r.completed_at?.toISOString() ?? null,
+    webhook_delivered_at: r.webhook_delivered_at?.toISOString() ?? null,
   };
 }
 
@@ -96,6 +102,10 @@ export async function updateRun(
       | 'error_message'
       | 'export_error'
       | 'completed_at'
+      | 'webhook_status'
+      | 'webhook_attempts'
+      | 'webhook_last_error'
+      | 'webhook_delivered_at'
     >
   >,
 ): Promise<void> {
@@ -112,6 +122,11 @@ export async function updateRun(
   if (patch.error_message !== undefined) push('error_message', patch.error_message);
   if (patch.export_error !== undefined) push('export_error', patch.export_error);
   if (patch.completed_at !== undefined) push('completed_at', patch.completed_at);
+  if (patch.webhook_status !== undefined) push('webhook_status', patch.webhook_status);
+  if (patch.webhook_attempts !== undefined) push('webhook_attempts', patch.webhook_attempts);
+  if (patch.webhook_last_error !== undefined) push('webhook_last_error', patch.webhook_last_error);
+  if (patch.webhook_delivered_at !== undefined)
+    push('webhook_delivered_at', patch.webhook_delivered_at);
   if (sets.length === 0) return;
   vals.push(runId);
   await getPool().query(

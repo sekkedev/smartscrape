@@ -39,6 +39,8 @@ type CreateInput = {
   sheet_tab_name?: string | null;
   setup_method?: 'manual' | 'ai';
   respect_robots_txt?: boolean;
+  webhook_url?: string | null;
+  webhook_secret?: string | null;
 };
 
 function readJsonFromOpt(value: string | undefined, label: string): unknown {
@@ -113,6 +115,8 @@ function buildCreateBody(
   if (opts.sheetId !== undefined) body.google_sheet_id = String(opts.sheetId);
   if (opts.sheetTab !== undefined) body.sheet_tab_name = String(opts.sheetTab);
   if (opts.respectRobots !== undefined) body.respect_robots_txt = Boolean(opts.respectRobots);
+  if (opts.webhookUrl !== undefined) body.webhook_url = String(opts.webhookUrl);
+  if (opts.webhookSecret !== undefined) body.webhook_secret = String(opts.webhookSecret);
   return body;
 }
 
@@ -199,6 +203,8 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
             `Compare key:  ${j.comparison_key ?? '(data hash)'}`,
             `Channels:     ${j.notify_channels.join(', ') || '(none)'}`,
             `Rules:        ${j.notification_rules.length}`,
+            `Webhook URL:  ${j.webhook_url ?? '(none)'}`,
+            `Webhook sec:  ${j.webhook_secret_configured ? 'configured' : '(none)'}`,
             `Last run:     ${j.last_run_at ?? 'never'}`,
             `Created:      ${j.created_at}`,
           ].join('\n'),
@@ -224,7 +230,12 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     .option('--model <id>', 'AI model id, e.g. openai/gpt-4o-mini')
     .option('--sheet-id <id>', 'Linked Google Sheet ID')
     .option('--sheet-tab <name>', 'Tab name within the sheet')
-    .option('--no-respect-robots', 'Ignore robots.txt for this job');
+    .option('--no-respect-robots', 'Ignore robots.txt for this job')
+    .option('--webhook-url <url>', 'POST run results to this URL after every terminal run')
+    .option(
+      '--webhook-secret <secret>',
+      'Optional HMAC secret. When set, payloads include X-Webhook-Signature',
+    );
   create.action(async (opts: Record<string, string | string[] | boolean | undefined>) => {
     const flags = getFlags();
     await runCommand(flags, async () => {
@@ -259,6 +270,8 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     .option('--model <id>', 'AI model id')
     .option('--sheet-id <id>', 'Linked Google Sheet ID')
     .option('--sheet-tab <name>', 'Tab name within the sheet')
+    .option('--webhook-url <url>', 'POST run results to this URL (pass empty string to clear)')
+    .option('--webhook-secret <secret>', 'HMAC secret (pass empty string to clear)')
     .action(async (id: string, opts: Record<string, string | boolean | undefined>) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
@@ -288,6 +301,13 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
         if (opts.model !== undefined) patch.ai_model = String(opts.model);
         if (opts.sheetId !== undefined) patch.google_sheet_id = String(opts.sheetId);
         if (opts.sheetTab !== undefined) patch.sheet_tab_name = String(opts.sheetTab);
+        if (opts.webhookUrl !== undefined) {
+          // Empty string clears the URL; otherwise pass-through.
+          patch.webhook_url = opts.webhookUrl === '' ? null : String(opts.webhookUrl);
+        }
+        if (opts.webhookSecret !== undefined) {
+          patch.webhook_secret = opts.webhookSecret === '' ? null : String(opts.webhookSecret);
+        }
 
         if (Object.keys(patch).length === 0) {
           throw new CliError(
@@ -391,6 +411,35 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
         }
         if (flags.json) emitJson(final, flags);
         else emitText(`Run ${final.id} → ${final.status} (items: ${final.items_extracted})`, flags);
+      });
+    });
+
+  const webhook = jobs
+    .command('webhook')
+    .description('Inspect and test the configured webhook for a job');
+
+  webhook
+    .command('test <id>')
+    .description("Send a synthetic payload to the job's webhook_url")
+    .action(async (id: string) => {
+      const flags = getFlags();
+      await runCommand(flags, async () => {
+        const client = createClient({
+          url: flags.serverUrl,
+          token: flags.token,
+          apiKey: flags.apiKey,
+        });
+        requireToken(client);
+        const data = await client.request<{ delivered: boolean; attempts: number; status: number }>(
+          `/api/jobs/${id}/webhook/test`,
+          { method: 'POST' },
+        );
+        if (flags.json) emitJson(data, flags);
+        else
+          emitText(
+            `Delivered after ${data.attempts} attempt(s) — receiver returned HTTP ${data.status}`,
+            flags,
+          );
       });
     });
 
