@@ -24,7 +24,7 @@ import { countRunsLast24h, findRun, listDataForRun, listRunsForJob } from '../db
 import { DAILY_RUN_QUOTA } from '../services/job-runner.js';
 import { toCsv } from '../lib/csv.js';
 import { findForUser as findApiKey, type Provider as ProviderName } from '../db/apiKeys.js';
-import { decrypt } from '../config/encryption.js';
+import { decrypt, encrypt } from '../config/encryption.js';
 import { scrape } from '../services/scraper.js';
 import { suggest } from '../services/ai-setup.js';
 import { extract } from '../services/ai-extractor.js';
@@ -105,6 +105,10 @@ const createBody = z.object({
   sheet_tab_name: z.string().nullable().optional(),
   setup_method: setupMethodEnum.optional(),
   respect_robots_txt: z.boolean().optional(),
+  // Webhooks. Pass `null` to clear; omit to leave as-is. webhook_secret is
+  // encrypted server-side before storage and never returned in the read API.
+  webhook_url: z.string().url().max(2048).nullable().optional(),
+  webhook_secret: z.string().min(8).max(256).nullable().optional(),
 });
 
 const updateBody = createBody.partial();
@@ -125,6 +129,41 @@ async function validateAllUrls(urls: string[]): Promise<string | null> {
     if (!r.ok) return `${u}: ${r.reason}`;
   }
   return null;
+}
+
+/**
+ * Strip `webhook_secret` (plaintext) off the request body, validate the URL
+ * if present, and return an `args`-shaped patch that contains the encrypted
+ * column instead. Used by both create and edit so the secret never reaches
+ * the DB module in plaintext.
+ */
+async function prepareWebhookFields(body: {
+  webhook_url?: string | null;
+  webhook_secret?: string | null;
+}): Promise<
+  | { ok: true; args: { webhook_url?: string | null; webhook_secret_encrypted?: string | null } }
+  | { ok: false; status: number; code: string; message: string }
+> {
+  const out: { webhook_url?: string | null; webhook_secret_encrypted?: string | null } = {};
+  if (body.webhook_url !== undefined) {
+    if (body.webhook_url !== null) {
+      const safety = await assertSafeUrl(body.webhook_url);
+      if (!safety.ok) {
+        return {
+          ok: false,
+          status: 400,
+          code: 'UNSAFE_URL',
+          message: `webhook_url: ${safety.reason}`,
+        };
+      }
+    }
+    out.webhook_url = body.webhook_url;
+  }
+  if (body.webhook_secret !== undefined) {
+    out.webhook_secret_encrypted =
+      body.webhook_secret === null ? null : encrypt(body.webhook_secret);
+  }
+  return { ok: true, args: out };
 }
 
 // ---------- routes ----------
@@ -297,9 +336,19 @@ jobsRouter.post('/', validate(createBody), async (req, res) => {
     res.status(400).json(fail('UNSAFE_URL', bad));
     return;
   }
+  const webhook = await prepareWebhookFields(body);
+  if (!webhook.ok) {
+    res.status(webhook.status).json(fail(webhook.code, webhook.message));
+    return;
+  }
+  // Drop the plaintext webhook_secret before forwarding to the DB module — it
+  // only travels as the encrypted ciphertext from here on.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { webhook_secret, ...rest } = body;
   const row = await createJob(req.user!.id, {
-    ...body,
-    extraction_schema: body.extraction_schema ?? null,
+    ...rest,
+    extraction_schema: rest.extraction_schema ?? null,
+    ...webhook.args,
   });
   await syncSchedule({
     jobId: row.id,
@@ -330,7 +379,14 @@ jobsRouter.patch('/:id', validate(idParam, 'params'), validate(updateBody), asyn
       return;
     }
   }
-  const row = await updateJob(req.user!.id, id, body);
+  const webhook = await prepareWebhookFields(body);
+  if (!webhook.ok) {
+    res.status(webhook.status).json(fail(webhook.code, webhook.message));
+    return;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { webhook_secret, ...rest } = body;
+  const row = await updateJob(req.user!.id, id, { ...rest, ...webhook.args });
   if (!row) {
     res.status(404).json(fail('NOT_FOUND', 'Job not found'));
     return;
@@ -503,6 +559,36 @@ jobsRouter.post(
     }
   },
 );
+
+jobsRouter.post('/:id/webhook/test', validate(idParam, 'params'), async (req, res) => {
+  const { id } = req.params as unknown as z.infer<typeof idParam>;
+  const job = await findJob(req.user!.id, id);
+  if (!job) {
+    res.status(404).json(fail('NOT_FOUND', 'Job not found'));
+    return;
+  }
+  if (!job.webhook_url) {
+    res.status(400).json(fail('NO_WEBHOOK_URL', 'This job has no webhook_url configured'));
+    return;
+  }
+  const { buildTestPayload, deliver } = await import('../services/webhooks.js');
+  const payload = buildTestPayload(job);
+  const result = await deliver({
+    url: job.webhook_url,
+    secretEncrypted: job.webhook_secret_encrypted,
+    payload,
+  });
+  if (!result.ok) {
+    res.status(502).json(
+      fail('WEBHOOK_TEST_FAILED', result.error ?? `HTTP ${result.status ?? '?'}`, {
+        attempts: result.attempts,
+        status: result.status,
+      }),
+    );
+    return;
+  }
+  res.status(200).json(ok({ delivered: true, attempts: result.attempts, status: result.status }));
+});
 
 jobsRouter.get('/:id/runs', validate(idParam, 'params'), async (req, res) => {
   const { id } = req.params as unknown as z.infer<typeof idParam>;

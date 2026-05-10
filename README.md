@@ -139,6 +139,17 @@ Every command supports `--json`, `--quiet`, `--server-url`, `--token`, `--api-ke
 
 Long-running automation should use a personal access token over JWT: `smartscrape auth tokens create --name ci-runner` mints one, plaintext is shown once, send it on every request via `SMARTSCRAPE_API_KEY` env or the `X-API-Key` header. Revoke any token from Settings or via `smartscrape auth tokens revoke <id>`.
 
+## Webhooks
+
+Configure a webhook on a job and SmartScrape POSTs the run results to that URL after every terminal run (completed or failed). Set the URL on create or edit:
+
+```bash
+smartscrape jobs edit <job-id> --webhook-url https://example.com/hook --webhook-secret '<long-secret>'
+smartscrape jobs webhook test <job-id>     # send a synthetic payload now
+```
+
+Payload shape: `{ event, job_id, job_name, run_id, status, items_count, urls_scraped, tokens_used, error_message, started_at, completed_at, changes: { added, removed, changed }, items: [...] }`. When a secret is configured, the request carries `X-Webhook-Signature: sha256=<hmac>` over the raw body and `X-Webhook-Timestamp`. Delivery retries up to 3 times with 1s → 4s backoff; the outcome is persisted on `webhook_status`, `webhook_attempts`, and `webhook_last_error` on the run row.
+
 ## How a run works
 
 1. You hit **Run now** (or cron fires the job).

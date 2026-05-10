@@ -1,7 +1,9 @@
 import { Queue, Worker, type QueueOptions, type WorkerOptions } from 'bullmq';
 import { env } from '../config/env.js';
 import { findJob } from '../db/jobs.js';
+import { findRun } from '../db/runs.js';
 import { runJob } from './job-runner.js';
+import { deliverForRun } from './webhooks.js';
 
 const QUEUE_NAME = 'scrape-runs';
 
@@ -49,7 +51,21 @@ export function startWorker(): Worker<ScrapeJobData> {
       const { jobId, userId, runId } = job.data;
       const row = await findJob(userId, jobId);
       if (!row) throw new Error(`Job ${jobId} not found for user ${userId}`);
-      return runJob(row, runId);
+      const summary = await runJob(row, runId);
+      // Webhook delivery is best-effort: failures are persisted on the run row
+      // (webhook_status / webhook_last_error) but never bubble up to fail the
+      // queue job. The receiver might be down for unrelated reasons.
+      if (row.webhook_url) {
+        try {
+          const runRow = await findRun(userId, summary.runId);
+          if (runRow) {
+            await deliverForRun({ job: row, userId, run: runRow });
+          }
+        } catch (err) {
+          console.error('[webhook] delivery error', err);
+        }
+      }
+      return summary;
     },
     opts,
   );

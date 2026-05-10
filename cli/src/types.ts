@@ -57,6 +57,8 @@ export type JobDTO = {
   sheet_tab_name: string | null;
   setup_method: SetupMethod;
   respect_robots_txt: boolean;
+  webhook_url: string | null;
+  webhook_secret_configured: boolean;
   last_run_at: string | null;
   created_at: string;
   updated_at: string;
@@ -78,6 +80,10 @@ export type RunDTO = {
   export_error: string | null;
   started_at: string;
   completed_at: string | null;
+  webhook_status: 'success' | 'failed' | null;
+  webhook_attempts: number;
+  webhook_last_error: string | null;
+  webhook_delivered_at: string | null;
 };
 
 export type ExtractedDataDTO = {
