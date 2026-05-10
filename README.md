@@ -116,6 +116,27 @@ Create an account, add at least one AI provider key under **Settings → AI Prov
 | `npm run test:e2e --workspace client` | Playwright smoke suite (requires dev server running) |
 | `npm run docs:screenshots --workspace client` | Regenerate the README screenshots |
 
+## CLI
+
+`@smartscrape/cli` is a headless client for the REST API — built so cron jobs, scripts, and external agents can drive SmartScrape without a browser. Source lives in [`cli/`](cli).
+
+```bash
+# Build the CLI workspace
+npm install
+npm run -w @smartscrape/cli build
+
+# Sign in (writes ~/.smartscrape/config.json) — or set SMARTSCRAPE_URL + SMARTSCRAPE_TOKEN
+node cli/dist/index.js auth login --url http://localhost:3000 --email you@example.com --password '...'
+
+# Drive everything
+node cli/dist/index.js jobs list --json
+node cli/dist/index.js jobs run <job-id> --wait --json
+node cli/dist/index.js results <job-id> --json
+node cli/dist/index.js export <job-id> --csv > out.csv
+```
+
+Every command supports `--json`, `--quiet`, `--url`, `--token`. Exit codes: `0` success, `1` generic, `2` auth, `3` not found, `4` validation. See [cli/README.md](cli/README.md) for the full command list.
+
 ## How a run works
 
 1. You hit **Run now** (or cron fires the job).
@@ -186,6 +207,7 @@ Create an account, add at least one AI provider key under **Settings → AI Prov
 smartscrape/
   server/    # Express + TS API, migrations, BullMQ worker
   client/    # React + Vite + Tailwind SPA + Playwright smoke tests
+  cli/       # Headless CLI client (commander + native fetch)
   docs/      # Screenshots, assets
   docker-compose.yml     # Postgres 16 + Redis 7 for local dev
 ```

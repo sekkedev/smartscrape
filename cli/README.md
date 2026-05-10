@@ -1,0 +1,47 @@
+# SmartScrape CLI
+
+Headless command-line client for the SmartScrape REST API. Built so external
+agents (OpenClaw, cron jobs, scripts) can drive SmartScrape without a browser.
+
+## Install (within the monorepo)
+
+```bash
+npm install
+npm run -w @smartscrape/cli build
+node cli/dist/index.js --help
+```
+
+Once published or linked, the `smartscrape` binary is available globally.
+
+## Configure
+
+The CLI reads `SMARTSCRAPE_URL` and `SMARTSCRAPE_TOKEN` from the environment, or
+falls back to `~/.smartscrape/config.json` written by `auth login`.
+
+```bash
+# Interactive login (writes config + refresh cookie)
+smartscrape auth login --url http://localhost:3000 --email you@example.com --password '...'
+
+# Non-interactive — env-only (preferred for cron/agents)
+export SMARTSCRAPE_URL=http://localhost:3000
+export SMARTSCRAPE_TOKEN=eyJhbGciOiJIUzI1NiIs...
+smartscrape jobs list --json
+```
+
+## Commands
+
+```
+auth login | logout | whoami
+jobs list | show <id> | create | edit <id> | delete <id> | toggle <id> | run <id>
+runs show <id> | data <id> | diff <id>
+results <job-id>            # latest run's data
+export <job-id> --csv | --json | --sheets
+settings show | set <key=value> | unset <key>
+providers list | set --provider <p> --key <k> | test <p> | delete <p>
+notifications test email | telegram
+dashboard stats
+```
+
+Every command supports `--json` (raw JSON to stdout) and `--quiet` (suppress
+non-error output). Exit codes: `0` success, `1` generic error, `2` auth failure,
+`3` not found, `4` validation error.
