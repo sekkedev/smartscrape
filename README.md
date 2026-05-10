@@ -135,7 +135,9 @@ node cli/dist/index.js results <job-id> --json
 node cli/dist/index.js export <job-id> --csv > out.csv
 ```
 
-Every command supports `--json`, `--quiet`, `--server-url`, `--token`. Exit codes: `0` success, `1` generic, `2` auth, `3` not found, `4` validation. See [cli/README.md](cli/README.md) for the full command list.
+Every command supports `--json`, `--quiet`, `--server-url`, `--token`, `--api-key`. Exit codes: `0` success, `1` generic, `2` auth, `3` not found, `4` validation. See [cli/README.md](cli/README.md) for the full command list.
+
+Long-running automation should use a personal access token over JWT: `smartscrape auth tokens create --name ci-runner` mints one, plaintext is shown once, send it on every request via `SMARTSCRAPE_API_KEY` env or the `X-API-Key` header. Revoke any token from Settings or via `smartscrape auth tokens revoke <id>`.
 
 ## How a run works
 

@@ -20,7 +20,11 @@ export function runsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (jobId: string) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.serverUrl, token: flags.token });
+        const client = createClient({
+          url: flags.serverUrl,
+          token: flags.token,
+          apiKey: flags.apiKey,
+        });
         requireToken(client);
         const data = await client.request<{ runs: RunDTO[] }>(`/api/jobs/${jobId}/runs`);
         if (flags.json) {
@@ -50,7 +54,11 @@ export function runsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (id: string) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.serverUrl, token: flags.token });
+        const client = createClient({
+          url: flags.serverUrl,
+          token: flags.token,
+          apiKey: flags.apiKey,
+        });
         requireToken(client);
         const data = await client.request<{ run: RunDTO }>(`/api/runs/${id}`);
         if (flags.json) {
@@ -84,7 +92,11 @@ export function runsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (id: string) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.serverUrl, token: flags.token });
+        const client = createClient({
+          url: flags.serverUrl,
+          token: flags.token,
+          apiKey: flags.apiKey,
+        });
         requireToken(client);
         const data = await client.request<{ data: ExtractedDataDTO[] }>(`/api/runs/${id}/data`);
         if (flags.json) {
@@ -119,7 +131,11 @@ export function runsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (id: string) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.serverUrl, token: flags.token });
+        const client = createClient({
+          url: flags.serverUrl,
+          token: flags.token,
+          apiKey: flags.apiKey,
+        });
         requireToken(client);
         const data = await client.request<{ diff: DiffResult }>(`/api/runs/${id}/diff`);
         if (flags.json) {

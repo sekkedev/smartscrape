@@ -100,7 +100,11 @@ export function extractRefreshCookie(setCookieHeader: string): string | null {
   return match ? match[0] : null;
 }
 
-export function createClient(overrides?: { url?: string; token?: string }): ApiClient {
+export function createClient(overrides?: {
+  url?: string;
+  token?: string;
+  apiKey?: string;
+}): ApiClient {
   const session = resolveSession(overrides);
 
   async function doFetch(
@@ -113,7 +117,10 @@ export function createClient(overrides?: { url?: string; token?: string }): ApiC
       accept: 'application/json',
       ...(opts.headers ?? {}),
     };
-    if (token) headers['authorization'] = `Bearer ${token}`;
+    // API key wins over JWT — headless callers configure SMARTSCRAPE_API_KEY
+    // precisely to avoid the refresh dance, so we honor it whenever it's set.
+    if (session.apiKey) headers['x-api-key'] = session.apiKey;
+    else if (token) headers['authorization'] = `Bearer ${token}`;
     let body: string | undefined;
     if (opts.body !== undefined) {
       headers['content-type'] = 'application/json';
@@ -125,7 +132,9 @@ export function createClient(overrides?: { url?: string; token?: string }): ApiC
   async function requestRaw(path: string, opts: RequestOpts = {}): Promise<Response> {
     let token = session.token;
     let res = await doFetch(path, opts, token);
-    if (res.status === 401 && !opts.noAutoRefresh && session.refreshCookie) {
+    // Don't refresh when authenticating via API key — those are long-lived and
+    // either work or are revoked; there's no JWT to renew.
+    if (res.status === 401 && !opts.noAutoRefresh && !session.apiKey && session.refreshCookie) {
       const refreshed = await tryRefresh(session);
       if (refreshed) {
         token = refreshed;
@@ -170,9 +179,10 @@ export function createClient(overrides?: { url?: string; token?: string }): ApiC
 }
 
 export function requireToken(client: ApiClient): void {
+  if (client.session.apiKey) return;
   if (!client.session.token) {
     throw new CliError(
-      "Not signed in. Run 'smartscrape auth login' or set SMARTSCRAPE_TOKEN.",
+      "Not signed in. Run 'smartscrape auth login', or set SMARTSCRAPE_API_KEY / SMARTSCRAPE_TOKEN.",
       EXIT.AUTH,
       'NO_TOKEN',
     );

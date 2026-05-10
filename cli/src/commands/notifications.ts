@@ -18,7 +18,11 @@ export function notificationsCommand(getFlags: () => GlobalFlags): Command {
             'BAD_CHANNEL',
           );
         }
-        const client = createClient({ url: flags.serverUrl, token: flags.token });
+        const client = createClient({
+          url: flags.serverUrl,
+          token: flags.token,
+          apiKey: flags.apiKey,
+        });
         requireToken(client);
         const data = await client.request<unknown>(`/api/notifications/test/${channel}`, {
           method: 'POST',
