@@ -76,6 +76,7 @@ export function runsCommand(getFlags: () => GlobalFlags): Command {
             `Tokens:      ${r.tokens_used}`,
             `Started:     ${r.started_at}`,
             `Completed:   ${r.completed_at ?? '—'}`,
+            r.error_type ? `Error type:  ${r.error_type}` : '',
             r.error_message ? `Error:       ${r.error_message}` : '',
             r.export_error ? `ExportErr:   ${r.export_error}` : '',
           ]

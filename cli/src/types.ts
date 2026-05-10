@@ -19,6 +19,15 @@ export type RunStatus =
   | 'completed'
   | 'failed';
 
+export type ErrorType =
+  | 'timeout'
+  | 'blocked'
+  | 'parse_error'
+  | 'ai_error'
+  | 'network_error'
+  | 'quota_error'
+  | 'unknown';
+
 export type NotificationRule =
   | { type: 'any_change'; message?: string }
   | { type: 'new_items'; message?: string }
@@ -67,6 +76,7 @@ export type JobDTO = {
 export type JobListItem = JobDTO & {
   last_run_status: string | null;
   last_run_items: number | null;
+  last_run_error_type: ErrorType | null;
 };
 
 export type RunDTO = {
@@ -77,6 +87,7 @@ export type RunDTO = {
   items_extracted: number;
   tokens_used: number;
   error_message: string | null;
+  error_type: ErrorType | null;
   export_error: string | null;
   started_at: string;
   completed_at: string | null;
