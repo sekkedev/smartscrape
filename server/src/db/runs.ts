@@ -1,4 +1,5 @@
 import { getPool } from '../config/database.js';
+import type { ErrorType } from '../lib/error-classifier.js';
 
 export type RunStatus =
   | 'pending'
@@ -16,6 +17,7 @@ export type RunRow = {
   items_extracted: number;
   tokens_used: number;
   error_message: string | null;
+  error_type: ErrorType | null;
   export_error: string | null;
   started_at: Date;
   completed_at: Date | null;
@@ -100,6 +102,7 @@ export async function updateRun(
       | 'items_extracted'
       | 'tokens_used'
       | 'error_message'
+      | 'error_type'
       | 'export_error'
       | 'completed_at'
       | 'webhook_status'
@@ -120,6 +123,7 @@ export async function updateRun(
   if (patch.items_extracted !== undefined) push('items_extracted', patch.items_extracted);
   if (patch.tokens_used !== undefined) push('tokens_used', patch.tokens_used);
   if (patch.error_message !== undefined) push('error_message', patch.error_message);
+  if (patch.error_type !== undefined) push('error_type', patch.error_type);
   if (patch.export_error !== undefined) push('export_error', patch.export_error);
   if (patch.completed_at !== undefined) push('completed_at', patch.completed_at);
   if (patch.webhook_status !== undefined) push('webhook_status', patch.webhook_status);
