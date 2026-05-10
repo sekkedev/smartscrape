@@ -6,7 +6,8 @@
   "license": "MIT",
   "workspaces": [
     "server",
-    "client"
+    "client",
+    "cli"
   ],
   "scripts": {
     "dev": "npm-run-all --parallel dev:server dev:client",
