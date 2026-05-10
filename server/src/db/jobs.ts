@@ -146,6 +146,7 @@ export type ListOpts = {
 export type JobListItem = JobDTO & {
   last_run_status: string | null;
   last_run_items: number | null;
+  last_run_error_type: string | null;
 };
 
 export async function listJobs(
@@ -162,10 +163,13 @@ export async function listJobs(
   // "failed" is evaluated after the LATERAL join so we add it below.
 
   const sql = `
-    SELECT j.*, lr.status AS last_run_status, lr.items_extracted AS last_run_items
+    SELECT j.*,
+           lr.status AS last_run_status,
+           lr.items_extracted AS last_run_items,
+           lr.error_type AS last_run_error_type
       FROM scrape_jobs j
       LEFT JOIN LATERAL (
-        SELECT status, items_extracted
+        SELECT status, items_extracted, error_type
           FROM scrape_runs
          WHERE job_id = j.id
          ORDER BY started_at DESC
@@ -176,12 +180,17 @@ export async function listJobs(
       ORDER BY j.created_at DESC
       LIMIT ${limit} OFFSET ${offset}`;
   const { rows } = await getPool().query<
-    JobRow & { last_run_status: string | null; last_run_items: number | null }
+    JobRow & {
+      last_run_status: string | null;
+      last_run_items: number | null;
+      last_run_error_type: string | null;
+    }
   >(sql, vals);
   const items = rows.map((r) => ({
     ...toDTO(r),
     last_run_status: r.last_run_status,
     last_run_items: r.last_run_items,
+    last_run_error_type: r.last_run_error_type,
   }));
 
   const countSql = `

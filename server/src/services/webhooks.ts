@@ -4,6 +4,7 @@ import type { JobRow } from '../db/jobs.js';
 import { listDataForRun, updateRun, type RunRow } from '../db/runs.js';
 import { diffRun, type DiffResult } from './change-detector.js';
 import { assertSafeUrl } from '../lib/ssrf.js';
+import type { ErrorType } from '../lib/error-classifier.js';
 
 /**
  * Shape of the body POSTed to a job's webhook_url after each terminal run.
@@ -19,6 +20,8 @@ export type WebhookPayload = {
   urls_scraped: number;
   tokens_used: number;
   error_message: string | null;
+  /** Classified failure bucket; null on completed runs and the test payload. */
+  error_type: ErrorType | null;
   started_at: string | null;
   completed_at: string | null;
   changes: {
@@ -134,6 +137,7 @@ export async function deliverForRun(args: {
   userId: string;
   run: Pick<RunRow, 'id' | 'status' | 'items_extracted' | 'urls_scraped' | 'tokens_used'> & {
     error_message: string | null;
+    error_type: ErrorType | null;
     started_at: Date | string;
     completed_at: Date | string | null;
   };
@@ -180,6 +184,7 @@ export async function deliverForRun(args: {
     urls_scraped: args.run.urls_scraped,
     tokens_used: args.run.tokens_used,
     error_message: args.run.error_message,
+    error_type: args.run.error_type,
     started_at: startedAt,
     completed_at: completedAt,
     changes: diff
@@ -221,6 +226,7 @@ export function buildTestPayload(job: JobRow): WebhookPayload {
     urls_scraped: 0,
     tokens_used: 0,
     error_message: null,
+    error_type: null,
     started_at: new Date().toISOString(),
     completed_at: new Date().toISOString(),
     changes: { added: 0, removed: 0, changed: 0 },

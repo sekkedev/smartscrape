@@ -25,6 +25,7 @@ function fakePayload(): WebhookPayload {
     urls_scraped: 1,
     tokens_used: 100,
     error_message: null,
+    error_type: null,
     started_at: '2026-05-10T20:00:00.000Z',
     completed_at: '2026-05-10T20:00:05.000Z',
     changes: { added: 1, removed: 0, changed: 1 },

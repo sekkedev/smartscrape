@@ -10,6 +10,8 @@ import { dispatch, evaluateRules } from './notification-service.js';
 import { pushRows } from './google-sheets.js';
 import { findConnection } from '../db/googleConnections.js';
 import { findUserById } from '../db/users.js';
+import { classifyError, type ErrorType } from '../lib/error-classifier.js';
+import { maybeAutoPause } from './auto-pause.js';
 
 export type RunSummary = {
   runId: string;
@@ -18,7 +20,53 @@ export type RunSummary = {
   itemsExtracted: number;
   tokensUsed: number;
   error?: string;
+  errorType?: ErrorType;
 };
+
+/**
+ * Finalize a failed run with a classified error_type, then check whether the
+ * job has hit the consecutive-failure threshold and auto-pause if so. Wraps
+ * the existing per-failure-site boilerplate so every exit path classifies
+ * and considers auto-pause uniformly.
+ */
+async function failAndMaybePause(args: {
+  runId: string;
+  jobId: string;
+  userId: string;
+  message: string;
+  partial?: { urlsScraped?: number; itemsExtracted?: number; tokensUsed?: number };
+}): Promise<RunSummary> {
+  const errorType = classifyError(args.message);
+  await updateRun(args.runId, {
+    status: 'failed',
+    error_message: args.message,
+    error_type: errorType,
+    urls_scraped: args.partial?.urlsScraped,
+    items_extracted: args.partial?.itemsExtracted,
+    tokens_used: args.partial?.tokensUsed,
+    completed_at: new Date(),
+  });
+  // Fire-and-forget the auto-pause check — its own failures are logged and
+  // shouldn't keep the run from returning to the worker.
+  void maybeAutoPause({
+    jobId: args.jobId,
+    userId: args.userId,
+    runId: args.runId,
+    errorType,
+    errorMessage: args.message,
+  }).catch((err) => {
+    console.error('[runner] auto-pause check failed', err);
+  });
+  return {
+    runId: args.runId,
+    jobId: args.jobId,
+    status: 'failed',
+    itemsExtracted: args.partial?.itemsExtracted ?? 0,
+    tokensUsed: args.partial?.tokensUsed ?? 0,
+    error: args.message,
+    errorType,
+  };
+}
 
 /**
  * Execute a full run for a job:
@@ -37,46 +85,34 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
   // We subtract 1 because the row above is already counted.
   const recent = await countRunsLast24h(job.user_id);
   if (recent - 1 >= DAILY_RUN_QUOTA) {
-    const err = `Daily run quota reached (${DAILY_RUN_QUOTA}/24h). Run skipped.`;
-    await updateRun(run.id, { status: 'failed', error_message: err, completed_at: new Date() });
-    return {
+    return failAndMaybePause({
       runId: run.id,
       jobId: job.id,
-      status: 'failed',
-      itemsExtracted: 0,
-      tokensUsed: 0,
-      error: err,
-    };
+      userId: job.user_id,
+      message: `Daily run quota reached (${DAILY_RUN_QUOTA}/24h). Run skipped.`,
+    });
   }
 
   const provider = job.ai_provider;
   const keyRow = await findApiKey(job.user_id, provider);
   if (!keyRow) {
-    const err = `No ${provider} API key configured`;
-    await updateRun(run.id, { status: 'failed', error_message: err, completed_at: new Date() });
-    return {
+    return failAndMaybePause({
       runId: run.id,
       jobId: job.id,
-      status: 'failed',
-      itemsExtracted: 0,
-      tokensUsed: 0,
-      error: err,
-    };
+      userId: job.user_id,
+      message: `No ${provider} API key configured`,
+    });
   }
   let apiKey: string;
   try {
     apiKey = decrypt(keyRow.api_key_encrypted);
   } catch {
-    const err = 'Stored provider key could not be decrypted';
-    await updateRun(run.id, { status: 'failed', error_message: err, completed_at: new Date() });
-    return {
+    return failAndMaybePause({
       runId: run.id,
       jobId: job.id,
-      status: 'failed',
-      itemsExtracted: 0,
-      tokensUsed: 0,
-      error: err,
-    };
+      userId: job.user_id,
+      message: 'Stored provider key could not be decrypted',
+    });
   }
 
   // Build the leak-guard lists once per run. Split by type so the API-key
@@ -191,21 +227,12 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await updateRun(run.id, {
-      status: 'failed',
-      urls_scraped: urlsScraped,
-      items_extracted: itemsExtracted,
-      tokens_used: tokensUsed,
-      error_message: message,
-      completed_at: new Date(),
-    });
-    return {
+    return failAndMaybePause({
       runId: run.id,
       jobId: job.id,
-      status: 'failed',
-      itemsExtracted,
-      tokensUsed,
-      error: message,
-    };
+      userId: job.user_id,
+      message,
+      partial: { urlsScraped, itemsExtracted, tokensUsed },
+    });
   }
 }

@@ -122,7 +122,9 @@ function buildCreateBody(
 
 function statusBadge(job: JobListItem): string {
   if (!job.enabled) return 'paused';
-  if (job.last_run_status === 'failed') return 'failed';
+  if (job.last_run_status === 'failed') {
+    return job.last_run_error_type ? `failed (${job.last_run_error_type})` : 'failed';
+  }
   if (job.last_run_status) return `active (${job.last_run_status})`;
   return 'active';
 }

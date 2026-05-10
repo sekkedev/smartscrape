@@ -139,6 +139,10 @@ Every command supports `--json`, `--quiet`, `--server-url`, `--token`, `--api-ke
 
 Long-running automation should use a personal access token over JWT: `smartscrape auth tokens create --name ci-runner` mints one, plaintext is shown once, send it on every request via `SMARTSCRAPE_API_KEY` env or the `X-API-Key` header. Revoke any token from Settings or via `smartscrape auth tokens revoke <id>`.
 
+## Failure classification + auto-pause
+
+Failed runs are classified into one of seven buckets — `timeout`, `blocked`, `parse_error`, `ai_error`, `network_error`, `quota_error`, `unknown` — and the type lands on the run row (`error_type`), the jobs list (`last_run_error_type`), and any webhook payload. After three consecutive failures, a job is auto-paused (`enabled=false`) and a `job_failed` notification fires on the user's configured channels. Re-enable with the toggle endpoint or `smartscrape jobs toggle <id>`.
+
 ## Webhooks
 
 Configure a webhook on a job and SmartScrape POSTs the run results to that URL after every terminal run (completed or failed). Set the URL on create or edit:
