@@ -18,7 +18,7 @@ program
   .version('0.9.0')
   .option('--json', 'Emit JSON instead of formatted tables')
   .option('--quiet', 'Suppress non-error output (data still goes to stdout)')
-  .option('--url <url>', 'Override the server URL (also: SMARTSCRAPE_URL env)')
+  .option('--server-url <url>', 'Override the SmartScrape server URL (also: SMARTSCRAPE_URL env)')
   .option('--token <token>', 'Override the access token (also: SMARTSCRAPE_TOKEN env)');
 
 // Commands read flags via a getter so children resolve them after parsing.

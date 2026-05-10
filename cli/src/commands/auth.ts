@@ -95,7 +95,7 @@ export function authCommand(getFlags: () => GlobalFlags): Command {
     .action(async () => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         if (!client.session.token) {
           throw new CliError(
             "Not signed in. Run 'smartscrape auth login' or set SMARTSCRAPE_TOKEN.",

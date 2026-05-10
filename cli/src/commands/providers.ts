@@ -35,7 +35,7 @@ export function providersCommand(getFlags: () => GlobalFlags): Command {
     .action(async () => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<{ providers: ProviderRow[] }>('/api/providers');
         if (flags.json) emitJson(data.providers, flags);
@@ -59,7 +59,7 @@ export function providersCommand(getFlags: () => GlobalFlags): Command {
       const flags = getFlags();
       await runCommand(flags, async () => {
         const provider = asProvider(opts.provider);
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<{ provider: ProviderRow }>('/api/providers', {
           method: 'POST',
@@ -77,7 +77,7 @@ export function providersCommand(getFlags: () => GlobalFlags): Command {
       const flags = getFlags();
       await runCommand(flags, async () => {
         const p = asProvider(provider);
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<unknown>(`/api/providers/${p}/test`, { method: 'POST' });
         if (flags.json) emitJson(data, flags);
@@ -92,7 +92,7 @@ export function providersCommand(getFlags: () => GlobalFlags): Command {
       const flags = getFlags();
       await runCommand(flags, async () => {
         const p = asProvider(provider);
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<{ provider: string; removed: boolean }>(
           `/api/providers/${p}`,

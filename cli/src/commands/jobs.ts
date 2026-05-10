@@ -135,7 +135,7 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (opts: { filter: string; limit: number; offset: number }) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<{ items: JobListItem[]; total: number }>('/api/jobs', {
           query: { filter: opts.filter, limit: opts.limit, offset: opts.offset },
@@ -169,7 +169,7 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (id: string) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<{ job: JobDTO }>(`/api/jobs/${id}`);
         if (flags.json) {
@@ -221,7 +221,7 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     const flags = getFlags();
     await runCommand(flags, async () => {
       const body = buildCreateBody(opts);
-      const client = createClient({ url: flags.url, token: flags.token });
+      const client = createClient({ url: flags.serverUrl, token: flags.token });
       requireToken(client);
       const data = await client.request<{ job: JobDTO }>('/api/jobs', {
         method: 'POST',
@@ -284,7 +284,7 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
             'NO_PATCH',
           );
         }
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<{ job: JobDTO }>(`/api/jobs/${id}`, {
           method: 'PATCH',
@@ -301,7 +301,7 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (id: string) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<{ job: JobDTO }>(`/api/jobs/${id}/toggle`, {
           method: 'PATCH',
@@ -325,7 +325,7 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
             'CONFIRM_REQUIRED',
           );
         }
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const data = await client.request<{ removed: boolean }>(`/api/jobs/${id}`, {
           method: 'DELETE',
@@ -343,7 +343,7 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (id: string, opts: { wait?: boolean; timeout: number }) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         const triggered = await client.request<{ run: RunDTO }>(`/api/jobs/${id}/run`, {
           method: 'POST',

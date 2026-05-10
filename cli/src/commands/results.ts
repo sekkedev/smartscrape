@@ -25,7 +25,7 @@ export function resultsCommand(getFlags: () => GlobalFlags): Command {
     .action(async (jobId: string, opts: { runId?: string; format: string }) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.url, token: flags.token });
+        const client = createClient({ url: flags.serverUrl, token: flags.token });
         requireToken(client);
         let runId = opts.runId;
         if (!runId) {

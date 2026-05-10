@@ -12,7 +12,7 @@ export const EXIT = {
 export type GlobalFlags = {
   json?: boolean;
   quiet?: boolean;
-  url?: string;
+  serverUrl?: string;
   token?: string;
 };
 

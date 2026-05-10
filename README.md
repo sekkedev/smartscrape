@@ -135,7 +135,7 @@ node cli/dist/index.js results <job-id> --json
 node cli/dist/index.js export <job-id> --csv > out.csv
 ```
 
-Every command supports `--json`, `--quiet`, `--url`, `--token`. Exit codes: `0` success, `1` generic, `2` auth, `3` not found, `4` validation. See [cli/README.md](cli/README.md) for the full command list.
+Every command supports `--json`, `--quiet`, `--server-url`, `--token`. Exit codes: `0` success, `1` generic, `2` auth, `3` not found, `4` validation. See [cli/README.md](cli/README.md) for the full command list.
 
 ## How a run works
 

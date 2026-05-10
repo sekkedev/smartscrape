@@ -43,5 +43,6 @@ dashboard stats
 ```
 
 Every command supports `--json` (raw JSON to stdout) and `--quiet` (suppress
-non-error output). Exit codes: `0` success, `1` generic error, `2` auth failure,
+non-error output), plus `--server-url` and `--token` for per-invocation
+overrides. Exit codes: `0` success, `1` generic error, `2` auth failure,
 `3` not found, `4` validation error.
