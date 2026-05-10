@@ -138,10 +138,26 @@ export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSu
   let tokensUsed = 0;
   const allBatches: { source_url: string; data: Record<string, unknown>; data_hash: string }[] = [];
 
+  // Pacing between successive URLs in the same job. When pacing_max_ms is
+  // unset we leave it to the per-host throttle in the scraper. When both are
+  // set, sleep a uniform-random ms in [min, max] before each URL after the
+  // first.
+  const pacingMin = job.pacing_min_ms ?? null;
+  const pacingMax = job.pacing_max_ms ?? null;
+
   try {
+    let urlIndex = 0;
     for (const url of job.urls) {
+      if (urlIndex > 0 && pacingMin !== null && pacingMax !== null) {
+        const delay = Math.floor(pacingMin + Math.random() * (pacingMax - pacingMin + 1));
+        if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+      }
+      urlIndex += 1;
       const page = await scrape(url, job.scrape_method, {
         respectRobotsTxt: job.respect_robots_txt,
+        stealth: job.stealth_mode,
+        stealthSeed: job.id,
+        proxyUrl: job.proxy_url,
       });
       urlsScraped += 1;
 

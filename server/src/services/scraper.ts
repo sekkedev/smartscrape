@@ -1,8 +1,11 @@
 import { chromium, type Browser } from 'playwright';
+import { ProxyAgent, type Dispatcher } from 'undici';
 import { cleanHtml, visibleTextLength } from './html-cleaner.js';
 import { assertSafeUrl } from '../lib/ssrf.js';
 import { createSemaphore } from '../lib/semaphore.js';
 import { isAllowedByRobots } from './robots.js';
+import { pickUserAgent } from '../lib/user-agents.js';
+import { STEALTH_INIT_SCRIPT } from '../lib/stealth.js';
 
 const USER_AGENT = 'SmartScrapeBot/0.1 (+https://github.com/9ny4/smartscrape)';
 // A realistic Chrome UA used on the Playwright fallback path where we want to
@@ -10,6 +13,30 @@ const USER_AGENT = 'SmartScrapeBot/0.1 (+https://github.com/9ny4/smartscrape)';
 // static fetches so well-behaved sites can identify us.
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+
+/**
+ * Parse a Playwright-shaped proxy config out of an http(s)://user:pass@host
+ * URL. Returns null when the input is blank so callers can fall straight
+ * through to a normal launch.
+ */
+export function parseProxy(proxyUrl: string | null | undefined): {
+  server: string;
+  username?: string;
+  password?: string;
+} | null {
+  if (!proxyUrl) return null;
+  let u: URL;
+  try {
+    u = new URL(proxyUrl);
+  } catch {
+    return null;
+  }
+  const server = `${u.protocol}//${u.host}`;
+  const out: { server: string; username?: string; password?: string } = { server };
+  if (u.username) out.username = decodeURIComponent(u.username);
+  if (u.password) out.password = decodeURIComponent(u.password);
+  return out;
+}
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const MIN_VISIBLE_TEXT = 200; // below this, fall back to Playwright
@@ -70,12 +97,25 @@ function describeError(err: unknown): string {
   return parts.filter(Boolean).join(' \u2014 ');
 }
 
+type FetchOpts = {
+  userAgent?: string;
+  proxyUrl?: string | null;
+};
+
 async function fetchWithCap(
   url: string,
   signal?: AbortSignal,
+  opts: FetchOpts = {},
 ): Promise<{ status: number; body: string; finalUrl: string }> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(new Error('Request timeout after 15s')), 15_000);
+  // Per-request proxy via undici. Without `dispatcher`, fetch uses the global
+  // dispatcher (which honors HTTP_PROXY when set at process start).
+  let dispatcher: Dispatcher | undefined;
+  if (opts.proxyUrl) {
+    dispatcher = new ProxyAgent(opts.proxyUrl);
+  }
+  const userAgent = opts.userAgent ?? USER_AGENT;
   try {
     // Manual redirect handling so each hop is re-validated by the SSRF guard.
     // `redirect: 'follow'` would cheerfully chase a 302 to http://169.254.169.254
@@ -86,9 +126,13 @@ async function fetchWithCap(
       const safety = await assertSafeUrl(currentUrl);
       if (!safety.ok) throw new Error(`Refused redirect to ${currentUrl}: ${safety.reason}`);
       res = await fetch(currentUrl, {
-        headers: { 'user-agent': USER_AGENT, accept: 'text/html,application/xhtml+xml' },
+        headers: { 'user-agent': userAgent, accept: 'text/html,application/xhtml+xml' },
         redirect: 'manual',
         signal: signal ?? ac.signal,
+        // The `dispatcher` field is a non-standard fetch option recognised by
+        // Node's bundled undici. Cast keeps TS happy without polluting the
+        // global RequestInit type.
+        ...(dispatcher ? ({ dispatcher } as unknown as RequestInit) : {}),
       });
       if (res.status >= 300 && res.status < 400) {
         const next = res.headers.get('location');
@@ -123,6 +167,9 @@ async function fetchWithCap(
     return { status: res.status, body: buf.toString('utf8'), finalUrl: res.url };
   } finally {
     clearTimeout(timer);
+    // ProxyAgent holds connections open; closing is fire-and-forget so a slow
+    // proxy doesn't drag the run worker.
+    if (dispatcher) void dispatcher.close().catch(() => undefined);
   }
 }
 
@@ -180,14 +227,22 @@ function isHttp2Error(err: unknown): boolean {
   return err instanceof Error && /ERR_HTTP2_PROTOCOL_ERROR/.test(err.message);
 }
 
+type PlaywrightOpts = {
+  userAgent?: string;
+  proxyUrl?: string | null;
+  stealth?: boolean;
+};
+
 async function fetchViaPlaywright(
   url: string,
   http1Only = false,
+  opts: PlaywrightOpts = {},
 ): Promise<{ status: number; body: string; finalUrl: string }> {
   const release = await playwrightSlots.acquire();
   const b = await browser(http1Only);
+  const proxy = parseProxy(opts.proxyUrl);
   const ctx = await b.newContext({
-    userAgent: BROWSER_UA,
+    userAgent: opts.userAgent ?? BROWSER_UA,
     viewport: { width: 1280, height: 800 },
     locale: 'en-US',
     extraHTTPHeaders: {
@@ -197,9 +252,15 @@ async function fetchViaPlaywright(
       'Sec-Fetch-Mode': 'navigate',
       'Sec-Fetch-Site': 'none',
     },
+    ...(proxy ? { proxy } : {}),
   });
   try {
     await attachSsrfRouteGuard(ctx);
+    if (opts.stealth) {
+      // Inject our minimal stealth init script before any page script runs.
+      // See server/src/lib/stealth.ts for what it patches and why.
+      await ctx.addInitScript(STEALTH_INIT_SCRIPT);
+    }
     const page = await ctx.newPage();
     // `domcontentloaded` is more forgiving than `networkidle` on pages with
     // persistent XHR/websocket activity (analytics etc).
@@ -220,12 +281,13 @@ async function fetchViaPlaywright(
 /** Playwright with one retry when the site rejects HTTP/2 (some bot walls do). */
 async function fetchViaPlaywrightWithRetry(
   url: string,
+  opts: PlaywrightOpts = {},
 ): Promise<{ status: number; body: string; finalUrl: string }> {
   try {
-    return await fetchViaPlaywright(url, false);
+    return await fetchViaPlaywright(url, false, opts);
   } catch (err) {
     if (isHttp2Error(err)) {
-      return await fetchViaPlaywright(url, true);
+      return await fetchViaPlaywright(url, true, opts);
     }
     throw err;
   }
@@ -234,6 +296,19 @@ async function fetchViaPlaywrightWithRetry(
 export type ScrapeOptions = {
   /** When true (default) we honor robots.txt for the configured user-agent. */
   respectRobotsTxt?: boolean;
+  /**
+   * When true, switch the Cheerio + Playwright paths to a rotating real-browser
+   * UA (deterministic per `stealthSeed`) and inject the Playwright stealth init
+   * script. Per-job toggle from `scrape_jobs.stealth_mode`.
+   */
+  stealth?: boolean;
+  /**
+   * Stable seed for the UA picker — usually the job id. Same seed → same UA
+   * across runs, which keeps target-site caching/cookies coherent.
+   */
+  stealthSeed?: string;
+  /** Per-job proxy (http(s)://[user:pass@]host:port). Overrides process env. */
+  proxyUrl?: string | null;
 };
 
 export async function scrape(
@@ -257,16 +332,31 @@ export async function scrape(
   const host = new URL(url).hostname;
   await throttle(host);
 
+  // When stealth_mode is on, pick a rotating real-browser UA seeded by the
+  // job id. Otherwise stick with our identifiable bot UA on the static path
+  // and the fixed Chrome UA on the Playwright path.
+  const stealthUa = opts.stealth && opts.stealthSeed ? pickUserAgent(opts.stealthSeed) : null;
+  const cheerioUa = stealthUa ?? USER_AGENT;
+  const playwrightOpts: PlaywrightOpts = {
+    userAgent: stealthUa ?? BROWSER_UA,
+    proxyUrl: opts.proxyUrl ?? null,
+    stealth: Boolean(opts.stealth),
+  };
+  const fetchOpts: FetchOpts = {
+    userAgent: cheerioUa,
+    proxyUrl: opts.proxyUrl ?? null,
+  };
+
   let primary: { status: number; body: string; finalUrl: string };
   let usedMethod: 'cheerio' | 'playwright';
 
   if (method === 'playwright') {
-    primary = await fetchViaPlaywrightWithRetry(url);
+    primary = await fetchViaPlaywrightWithRetry(url, playwrightOpts);
     usedMethod = 'playwright';
   } else {
     let cheerioErr: unknown = null;
     try {
-      primary = await fetchWithCap(url);
+      primary = await fetchWithCap(url, undefined, fetchOpts);
       usedMethod = 'cheerio';
     } catch (err) {
       cheerioErr = err;
@@ -276,7 +366,7 @@ export async function scrape(
       // Auto mode: fall back to Playwright on fetch failure.
       await throttle(host);
       try {
-        primary = await fetchViaPlaywrightWithRetry(url);
+        primary = await fetchViaPlaywrightWithRetry(url, playwrightOpts);
         usedMethod = 'playwright';
       } catch (pwErr) {
         throw new Error(
@@ -292,7 +382,7 @@ export async function scrape(
     ) {
       await throttle(host);
       try {
-        primary = await fetchViaPlaywrightWithRetry(url);
+        primary = await fetchViaPlaywrightWithRetry(url, playwrightOpts);
         usedMethod = 'playwright';
       } catch {
         // Keep the static result rather than failing outright.

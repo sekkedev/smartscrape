@@ -44,6 +44,10 @@ export type JobRow = {
   sheet_tab_name: string | null;
   setup_method: SetupMethod;
   respect_robots_txt: boolean;
+  stealth_mode: boolean;
+  proxy_url: string | null;
+  pacing_min_ms: number | null;
+  pacing_max_ms: number | null;
   webhook_url: string | null;
   /**
    * AES-256-GCM ciphertext of the user-supplied HMAC secret, or null. The
@@ -98,6 +102,10 @@ export type CreateJobArgs = {
   sheet_tab_name?: string | null;
   setup_method?: SetupMethod;
   respect_robots_txt?: boolean;
+  stealth_mode?: boolean;
+  proxy_url?: string | null;
+  pacing_min_ms?: number | null;
+  pacing_max_ms?: number | null;
   webhook_url?: string | null;
   webhook_secret_encrypted?: string | null;
 };
@@ -108,9 +116,11 @@ export async function createJob(userId: string, args: CreateJobArgs): Promise<Jo
        user_id, name, urls, extraction_prompt, extraction_schema,
        scrape_method, schedule, enabled, notification_rules, notify_channels,
        comparison_key, ai_provider, ai_model, google_sheet_id, sheet_tab_name, setup_method,
-       respect_robots_txt, webhook_url, webhook_secret_encrypted
+       respect_robots_txt, stealth_mode, proxy_url, pacing_min_ms, pacing_max_ms,
+       webhook_url, webhook_secret_encrypted
      )
-     VALUES ($1,$2,$3::jsonb,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+     VALUES ($1,$2,$3::jsonb,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16,
+             $17,$18,$19,$20,$21,$22,$23)
      RETURNING *`,
     [
       userId,
@@ -130,6 +140,10 @@ export async function createJob(userId: string, args: CreateJobArgs): Promise<Jo
       args.sheet_tab_name ?? null,
       args.setup_method ?? 'manual',
       args.respect_robots_txt ?? true,
+      args.stealth_mode ?? false,
+      args.proxy_url ?? null,
+      args.pacing_min_ms ?? null,
+      args.pacing_max_ms ?? null,
       args.webhook_url ?? null,
       args.webhook_secret_encrypted ?? null,
     ],
@@ -249,6 +263,10 @@ export async function updateJob(
   if (args.google_sheet_id !== undefined) push('google_sheet_id', args.google_sheet_id);
   if (args.sheet_tab_name !== undefined) push('sheet_tab_name', args.sheet_tab_name);
   if (args.respect_robots_txt !== undefined) push('respect_robots_txt', args.respect_robots_txt);
+  if (args.stealth_mode !== undefined) push('stealth_mode', args.stealth_mode);
+  if (args.proxy_url !== undefined) push('proxy_url', args.proxy_url);
+  if (args.pacing_min_ms !== undefined) push('pacing_min_ms', args.pacing_min_ms);
+  if (args.pacing_max_ms !== undefined) push('pacing_max_ms', args.pacing_max_ms);
   if (args.webhook_url !== undefined) push('webhook_url', args.webhook_url);
   if (args.webhook_secret_encrypted !== undefined)
     push('webhook_secret_encrypted', args.webhook_secret_encrypted);

@@ -52,6 +52,11 @@ Pass `--webhook-url <url>` and `--webhook-secret <secret>` on `jobs create` /
 `jobs edit` to receive POSTed run results. On `jobs edit`, an empty string
 (e.g. `--webhook-url ""`) clears the field.
 
+`--stealth`, `--proxy-url`, `--pacing-min`, and `--pacing-max` configure the
+anti-bot knobs (UA rotation + Playwright stealth, per-job proxy, jitter
+between URLs). On `jobs edit`, `--no-stealth` turns it off, `--proxy-url ""`
+clears the proxy, and `--pacing-min -1` / `--pacing-max -1` clear the bounds.
+
 Every command supports `--json` (raw JSON to stdout) and `--quiet` (suppress
 non-error output), plus `--server-url`, `--token`, and `--api-key` for
 per-invocation overrides. Exit codes: `0` success, `1` generic error, `2` auth

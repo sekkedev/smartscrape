@@ -66,6 +66,10 @@ export type JobDTO = {
   sheet_tab_name: string | null;
   setup_method: SetupMethod;
   respect_robots_txt: boolean;
+  stealth_mode: boolean;
+  proxy_url: string | null;
+  pacing_min_ms: number | null;
+  pacing_max_ms: number | null;
   webhook_url: string | null;
   webhook_secret_configured: boolean;
   last_run_at: string | null;

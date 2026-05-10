@@ -139,6 +139,19 @@ Every command supports `--json`, `--quiet`, `--server-url`, `--token`, `--api-ke
 
 Long-running automation should use a personal access token over JWT: `smartscrape auth tokens create --name ci-runner` mints one, plaintext is shown once, send it on every request via `SMARTSCRAPE_API_KEY` env or the `X-API-Key` header. Revoke any token from Settings or via `smartscrape auth tokens revoke <id>`.
 
+## Anti-bot resilience
+
+Each job has four knobs that help against targets with active bot detection:
+
+- **`stealth_mode`** — turns on UA rotation (a small pool of recent real-browser UAs, deterministic per job id so the target sees a stable identity across runs) and injects a minimal Playwright stealth init script (hides `navigator.webdriver`, plausibly populates `plugins`/`languages`, fixes the headless-Chrome `permissions.query` quirk).
+- **`proxy_url`** — per-job `http(s)://[user:pass@]host:port`. Applies to both the static (Cheerio) and rendered (Playwright) paths.
+- **`pacing_min_ms` / `pacing_max_ms`** — uniform-random sleep between successive URLs in a multi-URL job. The existing per-host throttle still runs underneath.
+- **Process-wide `HTTPS_PROXY` / `HTTP_PROXY` env** — when set at server start, every outbound fetch (scraper, AI SDKs, webhook delivery) routes through the configured proxy. Per-job `proxy_url` overrides on the scrape path.
+
+```bash
+smartscrape jobs edit <job-id> --stealth --proxy-url http://user:pass@proxy:3128 --pacing-min 500 --pacing-max 1500
+```
+
 ## Failure classification + auto-pause
 
 Failed runs are classified into one of seven buckets — `timeout`, `blocked`, `parse_error`, `ai_error`, `network_error`, `quota_error`, `unknown` — and the type lands on the run row (`error_type`), the jobs list (`last_run_error_type`), and any webhook payload. After three consecutive failures, a job is auto-paused (`enabled=false`) and a `job_failed` notification fires on the user's configured channels. Re-enable with the toggle endpoint or `smartscrape jobs toggle <id>`.

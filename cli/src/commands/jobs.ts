@@ -41,6 +41,10 @@ type CreateInput = {
   respect_robots_txt?: boolean;
   webhook_url?: string | null;
   webhook_secret?: string | null;
+  stealth_mode?: boolean;
+  proxy_url?: string | null;
+  pacing_min_ms?: number | null;
+  pacing_max_ms?: number | null;
 };
 
 function readJsonFromOpt(value: string | undefined, label: string): unknown {
@@ -117,6 +121,10 @@ function buildCreateBody(
   if (opts.respectRobots !== undefined) body.respect_robots_txt = Boolean(opts.respectRobots);
   if (opts.webhookUrl !== undefined) body.webhook_url = String(opts.webhookUrl);
   if (opts.webhookSecret !== undefined) body.webhook_secret = String(opts.webhookSecret);
+  if (opts.stealth === true) body.stealth_mode = true;
+  if (opts.proxyUrl !== undefined) body.proxy_url = String(opts.proxyUrl);
+  if (opts.pacingMin !== undefined) body.pacing_min_ms = Number(opts.pacingMin);
+  if (opts.pacingMax !== undefined) body.pacing_max_ms = Number(opts.pacingMax);
   return body;
 }
 
@@ -205,6 +213,13 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
             `Compare key:  ${j.comparison_key ?? '(data hash)'}`,
             `Channels:     ${j.notify_channels.join(', ') || '(none)'}`,
             `Rules:        ${j.notification_rules.length}`,
+            `Stealth:      ${j.stealth_mode ? 'on' : 'off'}`,
+            `Proxy:        ${j.proxy_url ?? '(none)'}`,
+            `Pacing:       ${
+              j.pacing_min_ms === null && j.pacing_max_ms === null
+                ? '(default throttle)'
+                : `${j.pacing_min_ms ?? '?'}–${j.pacing_max_ms ?? '?'} ms`
+            }`,
             `Webhook URL:  ${j.webhook_url ?? '(none)'}`,
             `Webhook sec:  ${j.webhook_secret_configured ? 'configured' : '(none)'}`,
             `Last run:     ${j.last_run_at ?? 'never'}`,
@@ -237,6 +252,17 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     .option(
       '--webhook-secret <secret>',
       'Optional HMAC secret. When set, payloads include X-Webhook-Signature',
+    )
+    .option('--stealth', 'Enable stealth_mode (rotating UA + Playwright fingerprint patches)')
+    .option(
+      '--proxy-url <url>',
+      'Route scrape requests through this proxy (http(s)://[user:pass@]host:port)',
+    )
+    .option('--pacing-min <ms>', 'Min ms to sleep between URLs in a multi-URL job', (v) =>
+      parseInt(v, 10),
+    )
+    .option('--pacing-max <ms>', 'Max ms to sleep between URLs in a multi-URL job', (v) =>
+      parseInt(v, 10),
     );
   create.action(async (opts: Record<string, string | string[] | boolean | undefined>) => {
     const flags = getFlags();
@@ -274,6 +300,11 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
     .option('--sheet-tab <name>', 'Tab name within the sheet')
     .option('--webhook-url <url>', 'POST run results to this URL (pass empty string to clear)')
     .option('--webhook-secret <secret>', 'HMAC secret (pass empty string to clear)')
+    .option('--stealth', 'Turn stealth_mode ON for this job')
+    .option('--no-stealth', 'Turn stealth_mode OFF for this job')
+    .option('--proxy-url <url>', 'Set proxy URL (pass empty string to clear)')
+    .option('--pacing-min <ms>', 'Min ms between URLs (-1 to clear)', (v) => parseInt(v, 10))
+    .option('--pacing-max <ms>', 'Max ms between URLs (-1 to clear)', (v) => parseInt(v, 10))
     .action(async (id: string, opts: Record<string, string | boolean | undefined>) => {
       const flags = getFlags();
       await runCommand(flags, async () => {
@@ -309,6 +340,19 @@ export function jobsCommand(getFlags: () => GlobalFlags): Command {
         }
         if (opts.webhookSecret !== undefined) {
           patch.webhook_secret = opts.webhookSecret === '' ? null : String(opts.webhookSecret);
+        }
+        // commander turns --stealth / --no-stealth into stealth=true/false
+        if (typeof opts.stealth === 'boolean') patch.stealth_mode = opts.stealth;
+        if (opts.proxyUrl !== undefined) {
+          patch.proxy_url = opts.proxyUrl === '' ? null : String(opts.proxyUrl);
+        }
+        if (opts.pacingMin !== undefined) {
+          const n = Number(opts.pacingMin);
+          patch.pacing_min_ms = n < 0 ? null : n;
+        }
+        if (opts.pacingMax !== undefined) {
+          const n = Number(opts.pacingMax);
+          patch.pacing_max_ms = n < 0 ? null : n;
         }
 
         if (Object.keys(patch).length === 0) {

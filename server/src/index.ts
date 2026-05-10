@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { env, requireSecrets } from './config/env.js';
 import { closeDatabase } from './config/database.js';
 import { closeRedis } from './config/redis.js';
@@ -25,6 +26,26 @@ import { fail } from './lib/response.js';
 
 // Fail fast if any runtime secret is missing or a placeholder.
 requireSecrets();
+
+// Honor HTTPS_PROXY / HTTP_PROXY at the process level so every outbound fetch
+// (cheerio scrape path, AI provider SDKs, webhook delivery, Google Sheets)
+// routes through the configured proxy by default. Per-job `proxy_url` still
+// overrides this on the scrape path. Lowercase variants are also recognised.
+{
+  const proxyEnv =
+    process.env.HTTPS_PROXY ??
+    process.env.https_proxy ??
+    process.env.HTTP_PROXY ??
+    process.env.http_proxy;
+  if (proxyEnv) {
+    try {
+      setGlobalDispatcher(new ProxyAgent(proxyEnv));
+      console.log(`[proxy] global dispatcher → ${proxyEnv.replace(/\/\/[^@]*@/, '//****@')}`);
+    } catch (err) {
+      console.error('[proxy] failed to install global dispatcher', err);
+    }
+  }
+}
 
 const app = express();
 

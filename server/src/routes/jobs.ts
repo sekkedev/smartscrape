@@ -73,7 +73,24 @@ const notificationRule = z.discriminatedUnion('type', [
 
 const extractionSchema = z.record(z.enum(['string', 'number', 'boolean', 'array', 'object']));
 
-const createBody = z.object({
+// The pacing order constraint runs as a refinement, but createBody is also
+// reused via `.partial()` for updates and `.extend()` for the AI-setup confirm
+// flow. ZodEffects (the result of `.refine`) doesn't support partial/extend,
+// so we factor the raw object out and apply the refinement at the use sites.
+function applyPacingRefinement<S extends z.ZodTypeAny>(schema: S): S {
+  return schema.refine(
+    (v: { pacing_min_ms?: number | null; pacing_max_ms?: number | null }) =>
+      v.pacing_min_ms === undefined ||
+      v.pacing_max_ms === undefined ||
+      v.pacing_min_ms === null ||
+      v.pacing_max_ms === null ||
+      v.pacing_min_ms <= v.pacing_max_ms,
+    { message: 'pacing_min_ms must be <= pacing_max_ms', path: ['pacing_max_ms'] },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+}
+
+const createBodyInner = z.object({
   name: z.string().trim().min(1).max(200),
   urls: z.array(z.string().url()).min(1).max(10),
   extraction_prompt: z.string().trim().min(5).max(5000),
@@ -105,13 +122,26 @@ const createBody = z.object({
   sheet_tab_name: z.string().nullable().optional(),
   setup_method: setupMethodEnum.optional(),
   respect_robots_txt: z.boolean().optional(),
+  // Anti-bot resilience knobs.
+  stealth_mode: z.boolean().optional(),
+  proxy_url: z
+    .string()
+    .url()
+    .max(2048)
+    .regex(/^https?:\/\//i, 'proxy_url must be http:// or https://')
+    .nullable()
+    .optional(),
+  pacing_min_ms: z.number().int().min(0).max(600_000).nullable().optional(),
+  pacing_max_ms: z.number().int().min(0).max(600_000).nullable().optional(),
   // Webhooks. Pass `null` to clear; omit to leave as-is. webhook_secret is
   // encrypted server-side before storage and never returned in the read API.
   webhook_url: z.string().url().max(2048).nullable().optional(),
   webhook_secret: z.string().min(8).max(256).nullable().optional(),
 });
 
-const updateBody = createBody.partial();
+const createBody = applyPacingRefinement(createBodyInner);
+
+const updateBody = applyPacingRefinement(createBodyInner.partial());
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -183,10 +213,12 @@ const aiPreviewBody = z.object({
   ai_model: z.string().min(1).max(120).optional(),
 });
 
-const aiConfirmBody = createBody.extend({
-  user_goal: z.string().trim().min(1).max(2000),
-  ai_suggestion: z.record(z.unknown()),
-});
+const aiConfirmBody = applyPacingRefinement(
+  createBodyInner.extend({
+    user_goal: z.string().trim().min(1).max(2000),
+    ai_suggestion: z.record(z.unknown()),
+  }),
+);
 
 async function resolveProviderKey(
   userId: string,
