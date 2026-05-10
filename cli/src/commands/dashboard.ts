@@ -12,7 +12,11 @@ export function dashboardCommand(getFlags: () => GlobalFlags): Command {
     .action(async () => {
       const flags = getFlags();
       await runCommand(flags, async () => {
-        const client = createClient({ url: flags.serverUrl, token: flags.token });
+        const client = createClient({
+          url: flags.serverUrl,
+          token: flags.token,
+          apiKey: flags.apiKey,
+        });
         requireToken(client);
         const data = await client.request<DashboardStats>('/api/dashboard/stats');
         if (flags.json) emitJson(data, flags);

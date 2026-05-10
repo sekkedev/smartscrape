@@ -14,6 +14,7 @@ export type GlobalFlags = {
   quiet?: boolean;
   serverUrl?: string;
   token?: string;
+  apiKey?: string;
 };
 
 export class CliError extends Error {

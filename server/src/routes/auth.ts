@@ -22,6 +22,13 @@ import {
   revokeAllForUser,
   revokeById,
 } from '../db/refreshTokens.js';
+import {
+  createToken as createPat,
+  listForUser as listPats,
+  revoke as revokePat,
+  toDTO as toPatDTO,
+} from '../db/personalAccessTokens.js';
+import { PAT_PREFIX } from '../middleware/auth.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { signAccessToken, REFRESH_TTL_MS } from '../lib/jwt.js';
 import { generateToken, hashToken } from '../lib/tokens.js';
@@ -297,3 +304,60 @@ authRouter.delete('/me', requireAuth, userGeneralLimiter, async (req, res) => {
   await deleteUser(req.user!.id);
   res.status(200).json(ok({ deleted: true }));
 });
+
+// ---------- personal access tokens ----------
+
+const createPatSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+});
+
+const patIdParam = z.object({ id: z.string().uuid() });
+
+/**
+ * Format: `sst_<base64url-22chars>`. Prefix makes the token grep-able in logs
+ * and obviously different from JWTs (which look like `eyJ…`). 22 chars of
+ * base64url = 132 bits of entropy, well past brute-force territory.
+ */
+function newAccessToken(): { plaintext: string; hash: string; prefix: string } {
+  const { token } = generateToken(16);
+  const plaintext = `${PAT_PREFIX}${token}`;
+  // Hash the *prefixed* plaintext so the auth-middleware lookup hashes the
+  // exact same string the client sends.
+  return { plaintext, hash: hashToken(plaintext), prefix: plaintext.slice(0, 12) };
+}
+
+authRouter.get('/access-tokens', requireAuth, userGeneralLimiter, async (req, res) => {
+  const rows = await listPats(req.user!.id);
+  res.status(200).json(ok({ tokens: rows.map(toPatDTO) }));
+});
+
+authRouter.post(
+  '/access-tokens',
+  requireAuth,
+  userGeneralLimiter,
+  validate(createPatSchema),
+  async (req, res) => {
+    const { name } = req.body as z.infer<typeof createPatSchema>;
+    const { plaintext, hash, prefix } = newAccessToken();
+    const row = await createPat({ userId: req.user!.id, name, tokenHash: hash, prefix });
+    // Plaintext is returned exactly once — clients must persist it now or
+    // mint a new token.
+    res.status(201).json(ok({ token: { ...toPatDTO(row), plaintext } }));
+  },
+);
+
+authRouter.delete(
+  '/access-tokens/:id',
+  requireAuth,
+  userGeneralLimiter,
+  validate(patIdParam, 'params'),
+  async (req, res) => {
+    const { id } = req.params as unknown as z.infer<typeof patIdParam>;
+    const ok_ = await revokePat(req.user!.id, id);
+    if (!ok_) {
+      res.status(404).json(fail('NOT_FOUND', 'Access token not found'));
+      return;
+    }
+    res.status(200).json(ok({ revoked: true }));
+  },
+);

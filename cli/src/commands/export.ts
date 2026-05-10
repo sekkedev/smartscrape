@@ -30,7 +30,11 @@ export function exportCommand(getFlags: () => GlobalFlags): Command {
               'BAD_TARGET',
             );
           }
-          const client = createClient({ url: flags.serverUrl, token: flags.token });
+          const client = createClient({
+            url: flags.serverUrl,
+            token: flags.token,
+            apiKey: flags.apiKey,
+          });
           requireToken(client);
 
           if (opts.sheets) {

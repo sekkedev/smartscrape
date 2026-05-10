@@ -124,3 +124,12 @@ export type UserPublic = {
   email_verified: boolean;
   telegram_chat_id: string | null;
 };
+
+export type AccessToken = {
+  id: string;
+  name: string;
+  prefix: string;
+  last_used_at: string | null;
+  created_at: string;
+  revoked_at: string | null;
+};

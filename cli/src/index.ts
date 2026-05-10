@@ -19,7 +19,11 @@ program
   .option('--json', 'Emit JSON instead of formatted tables')
   .option('--quiet', 'Suppress non-error output (data still goes to stdout)')
   .option('--server-url <url>', 'Override the SmartScrape server URL (also: SMARTSCRAPE_URL env)')
-  .option('--token <token>', 'Override the access token (also: SMARTSCRAPE_TOKEN env)');
+  .option('--token <token>', 'Override the JWT access token (also: SMARTSCRAPE_TOKEN env)')
+  .option(
+    '--api-key <key>',
+    'Use a personal access token instead of a JWT (also: SMARTSCRAPE_API_KEY env)',
+  );
 
 // Commands read flags via a getter so children resolve them after parsing.
 const getFlags = (): GlobalFlags => program.opts<GlobalFlags>();

@@ -22,16 +22,21 @@ falls back to `~/.smartscrape/config.json` written by `auth login`.
 # Interactive login (writes config + refresh cookie)
 smartscrape auth login --url http://localhost:3000 --email you@example.com --password '...'
 
-# Non-interactive — env-only (preferred for cron/agents)
+# Personal access token — preferred for cron/agents, never expires until revoked
+smartscrape auth tokens create --name "ci-runner" > /run/secrets/smartscrape-token
 export SMARTSCRAPE_URL=http://localhost:3000
-export SMARTSCRAPE_TOKEN=eyJhbGciOiJIUzI1NiIs...
+export SMARTSCRAPE_API_KEY=$(cat /run/secrets/smartscrape-token)
 smartscrape jobs list --json
+
+# JWT — works too, but cron needs to handle the refresh cookie
+export SMARTSCRAPE_TOKEN=eyJhbGciOiJIUzI1NiIs...
 ```
 
 ## Commands
 
 ```
 auth login | logout | whoami
+auth tokens list | create --name <n> | revoke <id>
 jobs list | show <id> | create | edit <id> | delete <id> | toggle <id> | run <id>
 runs show <id> | data <id> | diff <id>
 results <job-id>            # latest run's data
@@ -43,6 +48,6 @@ dashboard stats
 ```
 
 Every command supports `--json` (raw JSON to stdout) and `--quiet` (suppress
-non-error output), plus `--server-url` and `--token` for per-invocation
-overrides. Exit codes: `0` success, `1` generic error, `2` auth failure,
-`3` not found, `4` validation error.
+non-error output), plus `--server-url`, `--token`, and `--api-key` for
+per-invocation overrides. Exit codes: `0` success, `1` generic error, `2` auth
+failure, `3` not found, `4` validation error.

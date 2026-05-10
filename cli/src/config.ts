@@ -53,24 +53,35 @@ export function clearConfig(): void {
 
 export type ResolvedSession = {
   url: string;
+  /** A short-lived JWT, when one is available. Null when authenticating via PAT. */
   token: string | null;
   refreshCookie: string | null;
   email: string | null;
+  /** A personal access token (`sst_…`), used in `X-API-Key`. Wins over JWT when present. */
+  apiKey: string | null;
 };
 
 /**
  * Layer env vars on top of the stored config. Env wins so cron jobs and agents
- * can override without touching ~/.smartscrape/config.json.
+ * can override without touching ~/.smartscrape/config.json. The API-key path
+ * has its own env var (SMARTSCRAPE_API_KEY) so headless callers can avoid the
+ * JWT refresh dance entirely.
  */
-export function resolveSession(overrides?: { url?: string; token?: string }): ResolvedSession {
+export function resolveSession(overrides?: {
+  url?: string;
+  token?: string;
+  apiKey?: string;
+}): ResolvedSession {
   const stored = loadConfig();
   const url = overrides?.url ?? process.env.SMARTSCRAPE_URL ?? stored.url;
   const token = overrides?.token ?? process.env.SMARTSCRAPE_TOKEN ?? stored.accessToken;
+  const apiKey = overrides?.apiKey ?? process.env.SMARTSCRAPE_API_KEY ?? null;
   return {
     url: url.replace(/\/$/, ''),
     token: token ?? null,
     refreshCookie: stored.refreshCookie,
     email: stored.email,
+    apiKey,
   };
 }
 
