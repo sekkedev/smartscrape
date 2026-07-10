@@ -4,7 +4,12 @@ vi.mock('../db/runs.js', () => ({
   sweepStaleRuns: vi.fn(),
 }));
 
-import { STALE_RUN_THRESHOLD_MS, SWEEP_INTERVAL_MS, startStaleRunSweeper, sweepOnce } from './stale-runs.js';
+import {
+  STALE_RUN_THRESHOLD_MS,
+  SWEEP_INTERVAL_MS,
+  startStaleRunSweeper,
+  sweepOnce,
+} from './stale-runs.js';
 import { sweepStaleRuns } from '../db/runs.js';
 
 beforeEach(() => {

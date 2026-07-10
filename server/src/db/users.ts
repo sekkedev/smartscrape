@@ -52,7 +52,9 @@ export async function findUserById(id: string): Promise<UserRow | null> {
 
 /** Total registered users. Used by the registration gate's first-user bootstrap. */
 export async function countUsers(): Promise<number> {
-  const { rows } = await getPool().query<{ count: string }>(`SELECT count(*)::text AS count FROM users`);
+  const { rows } = await getPool().query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM users`,
+  );
   return Number.parseInt(rows[0]?.count ?? '0', 10);
 }
 
