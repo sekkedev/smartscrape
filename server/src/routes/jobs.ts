@@ -162,6 +162,19 @@ async function validateAllUrls(urls: string[]): Promise<string | null> {
 }
 
 /**
+ * Per-job proxy hosts get the same private-IP/SSRF guard as target and
+ * webhook URLs — a proxy pointed at 169.254.169.254 or an internal service
+ * would otherwise relay every scrape request straight into the network the
+ * regex-only schema check can't see.
+ */
+async function validateProxyUrl(proxyUrl: string | null | undefined): Promise<string | null> {
+  if (proxyUrl === null || proxyUrl === undefined) return null;
+  const r = await assertSafeUrl(proxyUrl);
+  if (!r.ok) return `proxy_url: ${r.reason}`;
+  return null;
+}
+
+/**
  * Strip `webhook_secret` (plaintext) off the request body, validate the URL
  * if present, and return an `args`-shaped patch that contains the encrypted
  * column instead. Used by both create and edit so the secret never reaches
@@ -333,7 +346,7 @@ jobsRouter.post('/ai-setup/preview', aiSetupLimiter, validate(aiPreviewBody), as
 
 jobsRouter.post('/ai-setup/confirm', validate(aiConfirmBody), async (req, res) => {
   const body = req.body as z.infer<typeof aiConfirmBody>;
-  const bad = await validateAllUrls(body.urls);
+  const bad = (await validateAllUrls(body.urls)) ?? (await validateProxyUrl(body.proxy_url));
   if (bad) {
     res.status(400).json(fail('UNSAFE_URL', bad));
     return;
@@ -363,7 +376,7 @@ jobsRouter.get('/', validate(listQuery, 'query'), async (req, res) => {
 
 jobsRouter.post('/', validate(createBody), async (req, res) => {
   const body = req.body as z.infer<typeof createBody>;
-  const bad = await validateAllUrls(body.urls);
+  const bad = (await validateAllUrls(body.urls)) ?? (await validateProxyUrl(body.proxy_url));
   if (bad) {
     res.status(400).json(fail('UNSAFE_URL', bad));
     return;
@@ -406,6 +419,13 @@ jobsRouter.patch('/:id', validate(idParam, 'params'), validate(updateBody), asyn
   const body = req.body as z.infer<typeof updateBody>;
   if (body.urls) {
     const bad = await validateAllUrls(body.urls);
+    if (bad) {
+      res.status(400).json(fail('UNSAFE_URL', bad));
+      return;
+    }
+  }
+  {
+    const bad = await validateProxyUrl(body.proxy_url);
     if (bad) {
       res.status(400).json(fail('UNSAFE_URL', bad));
       return;

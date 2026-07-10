@@ -1,9 +1,14 @@
 #!/usr/bin/env node
+// Plain-JS migration runner. Deliberately dependency-light: the production
+// Docker image installs with `--omit=dev`, so this script must run on nothing
+// but node + production deps (node-pg-migrate, dotenv). The previous TS
+// version needed tsx (a devDependency) and imported src/config/env.ts (not
+// shipped in the runtime image), which made the container crash-loop at boot.
+import 'dotenv/config';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { runner } from 'node-pg-migrate';
-import { env } from '../src/config/env.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = resolve(__dirname, '..', 'migrations');
@@ -12,12 +17,10 @@ if (!existsSync(migrationsDir)) {
   mkdirSync(migrationsDir, { recursive: true });
 }
 
-type Direction = 'up' | 'down' | 'redo';
-
 const [rawCommand, rawArg] = process.argv.slice(2);
 const command = rawCommand ?? 'up';
 
-function usage(): never {
+function usage() {
   console.error('usage: migrate <up|down|redo|create> [name]');
   process.exit(1);
 }
@@ -44,43 +47,26 @@ if (command === 'create') {
 
 if (!['up', 'down', 'redo'].includes(command)) usage();
 
-if (!env.databaseUrl) {
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
   console.error('DATABASE_URL is not set');
   process.exit(1);
 }
 
-const direction = command as Direction;
+const base = {
+  databaseUrl,
+  dir: migrationsDir,
+  migrationsTable: 'pgmigrations',
+  verbose: true,
+  singleTransaction: true,
+};
 
 try {
-  if (direction === 'redo') {
-    await runner({
-      databaseUrl: env.databaseUrl,
-      dir: migrationsDir,
-      migrationsTable: 'pgmigrations',
-      direction: 'down',
-      count: 1,
-      verbose: true,
-      singleTransaction: true,
-    });
-    await runner({
-      databaseUrl: env.databaseUrl,
-      dir: migrationsDir,
-      migrationsTable: 'pgmigrations',
-      direction: 'up',
-      count: 1,
-      verbose: true,
-      singleTransaction: true,
-    });
+  if (command === 'redo') {
+    await runner({ ...base, direction: 'down', count: 1 });
+    await runner({ ...base, direction: 'up', count: 1 });
   } else {
-    await runner({
-      databaseUrl: env.databaseUrl,
-      dir: migrationsDir,
-      migrationsTable: 'pgmigrations',
-      direction,
-      count: direction === 'down' ? 1 : Infinity,
-      verbose: true,
-      singleTransaction: true,
-    });
+    await runner({ ...base, direction: command, count: command === 'down' ? 1 : Infinity });
   }
   process.exit(0);
 } catch (err) {

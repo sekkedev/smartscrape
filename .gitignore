@@ -19,3 +19,6 @@ test-results/
 !.vscode/extensions.json
 .idea/
 .tmp/
+
+# Local agent worktrees / config
+.claude/

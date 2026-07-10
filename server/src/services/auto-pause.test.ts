@@ -84,6 +84,16 @@ describe('isInFailureStreak', () => {
     );
     expect(await isInFailureStreak('job-1')).toBe(false);
   });
+
+  it('excludes quota-limited and interrupted runs from the streak window', async () => {
+    const pool = poolReturning([]);
+    vi.mocked(getPool).mockReturnValue(pool as never);
+    await isInFailureStreak('job-1');
+    const [sql] = pool.query.mock.calls[0]!;
+    // The window must ignore runs that say nothing about job health: quota
+    // skips and crash-orphaned runs closed by the stale-run sweeper.
+    expect(sql).toContain("NOT IN ('quota_error', 'interrupted')");
+  });
 });
 
 describe('rollingFailureRate', () => {

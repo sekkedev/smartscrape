@@ -50,6 +50,12 @@ export async function findUserById(id: string): Promise<UserRow | null> {
   return rows[0] ?? null;
 }
 
+/** Total registered users. Used by the registration gate's first-user bootstrap. */
+export async function countUsers(): Promise<number> {
+  const { rows } = await getPool().query<{ count: string }>(`SELECT count(*)::text AS count FROM users`);
+  return Number.parseInt(rows[0]?.count ?? '0', 10);
+}
+
 export async function findUserByVerificationToken(tokenHash: string): Promise<UserRow | null> {
   const { rows } = await getPool().query<UserRow>(
     `SELECT * FROM users WHERE verification_token = $1 LIMIT 1`,

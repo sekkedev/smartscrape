@@ -25,6 +25,8 @@ export type RunRow = {
   webhook_attempts: number;
   webhook_last_error: string | null;
   webhook_delivered_at: Date | null;
+  /** BullMQ job id that produced this run; null for pre-migration rows. */
+  queue_job_id: string | null;
 };
 
 export type RunDTO = Omit<RunRow, 'started_at' | 'completed_at' | 'webhook_delivered_at'> & {
@@ -84,12 +86,45 @@ export async function countRunsLast24h(userId: string): Promise<number> {
   return Number.parseInt(rows[0]?.count ?? '0', 10);
 }
 
-export async function createRun(jobId: string): Promise<RunRow> {
+export async function createRun(jobId: string, queueJobId?: string | null): Promise<RunRow> {
   const { rows } = await getPool().query<RunRow>(
-    `INSERT INTO scrape_runs (job_id, status) VALUES ($1, 'pending') RETURNING *`,
-    [jobId],
+    `INSERT INTO scrape_runs (job_id, status, queue_job_id) VALUES ($1, 'pending', $2) RETURNING *`,
+    [jobId, queueJobId ?? null],
   );
   return rows[0]!;
+}
+
+/**
+ * Find the run created for a specific BullMQ job id. Lets a stalled-job retry
+ * attach to the run the crashed attempt already created instead of opening a
+ * duplicate row. Newest first in the (theoretical) case of collisions.
+ */
+export async function findRunByQueueJobId(queueJobId: string): Promise<RunRow | null> {
+  const { rows } = await getPool().query<RunRow>(
+    `SELECT * FROM scrape_runs WHERE queue_job_id = $1 ORDER BY started_at DESC LIMIT 1`,
+    [queueJobId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Close out runs stuck in a non-terminal status for longer than the
+ * threshold — the signature a crash or restart leaves behind. Returns the
+ * number of runs swept. `error_type = 'interrupted'` keeps them out of the
+ * auto-pause failure streak (see services/auto-pause.ts).
+ */
+export async function sweepStaleRuns(olderThanMs: number): Promise<number> {
+  const { rowCount } = await getPool().query(
+    `UPDATE scrape_runs
+        SET status = 'failed',
+            error_message = 'Run interrupted — the server crashed or restarted mid-run',
+            error_type = 'interrupted',
+            completed_at = now()
+      WHERE status IN ('pending', 'scraping', 'extracting', 'exporting')
+        AND started_at < now() - ($1 * interval '1 millisecond')`,
+    [olderThanMs],
+  );
+  return rowCount ?? 0;
 }
 
 export async function updateRun(

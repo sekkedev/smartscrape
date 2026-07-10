@@ -9,7 +9,8 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { env, requireSecrets } from './config/env.js';
 import { closeDatabase } from './config/database.js';
 import { closeRedis } from './config/redis.js';
-import { closeQueue, startWorker } from './services/job-queue.js';
+import { closeQueue, reconcileSchedules, startWorker } from './services/job-queue.js';
+import { startStaleRunSweeper } from './services/stale-runs.js';
 import { closeScraper } from './services/scraper.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
@@ -138,6 +139,25 @@ if (env.redisUrl) {
   } catch (err) {
     console.error('[queue] failed to start worker', err);
   }
+
+  // Postgres is the source of truth for what should be scheduled; rebuild the
+  // BullMQ schedulers from it on every boot so Redis loss can't silently kill
+  // schedules. Failure here is logged loudly but doesn't stop the server —
+  // manual runs and the API still work without schedules.
+  if (env.databaseUrl) {
+    void reconcileSchedules()
+      .then(({ upserted, removed }) => {
+        console.log(`[queue] schedules reconciled from Postgres (${upserted} active, ${removed} orphaned removed)`);
+      })
+      .catch((err) => {
+        console.error('[queue] schedule reconciliation failed — scheduled runs may not fire', err);
+      });
+  }
+}
+
+// Close out runs orphaned by a previous crash/restart, then keep sweeping.
+if (env.databaseUrl) {
+  startStaleRunSweeper();
 }
 
 async function shutdown(signal: string): Promise<void> {

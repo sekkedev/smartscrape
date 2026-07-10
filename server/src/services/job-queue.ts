@@ -1,8 +1,8 @@
 import { Queue, Worker, type QueueOptions, type WorkerOptions } from 'bullmq';
 import { env } from '../config/env.js';
-import { findJob } from '../db/jobs.js';
-import { findRun } from '../db/runs.js';
-import { runJob } from './job-runner.js';
+import { findJob, listScheduledJobs } from '../db/jobs.js';
+import { createRun, findRun, findRunByQueueJobId } from '../db/runs.js';
+import { runJob, type RunSummary } from './job-runner.js';
 import { deliverForRun } from './webhooks.js';
 
 const QUEUE_NAME = 'scrape-runs';
@@ -51,7 +51,36 @@ export function startWorker(): Worker<ScrapeJobData> {
       const { jobId, userId, runId } = job.data;
       const row = await findJob(userId, jobId);
       if (!row) throw new Error(`Job ${jobId} not found for user ${userId}`);
-      const summary = await runJob(row, runId);
+
+      // Run identity. Manual triggers pass runId in the payload; scheduled
+      // jobs don't, so we key the run on the BullMQ job id. A stalled-job
+      // retry (worker crashed mid-run) carries the same BullMQ id, so it
+      // reattaches to the run the crashed attempt opened instead of creating
+      // a duplicate row — and if that run somehow already reached a terminal
+      // state, we return it untouched rather than running twice.
+      let effectiveRunId = runId;
+      if (!effectiveRunId && job.id) {
+        const existing = await findRunByQueueJobId(String(job.id));
+        if (existing) {
+          if (existing.status === 'completed' || existing.status === 'failed') {
+            return {
+              runId: existing.id,
+              jobId: existing.job_id,
+              status: existing.status,
+              itemsExtracted: existing.items_extracted,
+              tokensUsed: existing.tokens_used,
+              error: existing.error_message ?? undefined,
+              errorType: existing.error_type ?? undefined,
+            } satisfies RunSummary;
+          }
+          effectiveRunId = existing.id;
+        } else {
+          const created = await createRun(jobId, String(job.id));
+          effectiveRunId = created.id;
+        }
+      }
+
+      const summary = await runJob(row, effectiveRunId);
       // Webhook delivery is best-effort: failures are persisted on the run row
       // (webhook_status / webhook_last_error) but never bubble up to fail the
       // queue job. The receiver might be down for unrelated reasons.
@@ -117,4 +146,40 @@ export async function syncSchedule(args: {
 
 export async function enqueueNow(data: ScrapeJobData): Promise<void> {
   await getQueue().add('manual', data, { jobId: `manual-${data.jobId}-${Date.now()}` });
+}
+
+/**
+ * Reconcile BullMQ job schedulers against Postgres at boot. Redis is a
+ * derived cache: if it was flushed, restored from an old snapshot, or simply
+ * lost, every enabled+scheduled job in Postgres is re-upserted here, and any
+ * `scrape-*` scheduler with no matching enabled job is removed. Without this,
+ * Redis data loss silently kills all schedules while the UI still shows
+ * `enabled = true`.
+ *
+ * Only keys with the `scrape-` prefix are touched, so an unrelated queue
+ * sharing the Redis instance is left alone.
+ */
+export async function reconcileSchedules(): Promise<{ upserted: number; removed: number }> {
+  const q = getQueue();
+  const jobs = await listScheduledJobs();
+  const wanted = new Set(jobs.map((j) => repeatableKey(j.id)));
+
+  let removed = 0;
+  const existing = await q.getJobSchedulers();
+  for (const s of existing) {
+    if (s.key && s.key.startsWith('scrape-') && !wanted.has(s.key)) {
+      await q.removeJobScheduler(s.key);
+      removed += 1;
+    }
+  }
+
+  for (const j of jobs) {
+    await q.upsertJobScheduler(
+      repeatableKey(j.id),
+      { pattern: j.schedule },
+      { name: 'scheduled', data: { jobId: j.id, userId: j.user_id } },
+    );
+  }
+
+  return { upserted: jobs.length, removed };
 }
