@@ -126,43 +126,57 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
     );
 });
 
-const server = app.listen(env.port, () => {
-  console.log(`[server] listening on http://localhost:${env.port}`);
-});
+// Boot sequence. Schedule reconciliation must finish BEFORE the server starts
+// accepting requests: it removes BullMQ schedulers with no matching enabled
+// job, and a job created via the API mid-reconcile could otherwise have its
+// fresh scheduler swept as "orphaned". So we reconcile first, then listen.
+let server: import('node:http').Server;
 
-// Start the BullMQ worker in-process. For production deployments this would
-// typically run in its own service; single-process is fine for dev + v1.
-if (env.redisUrl) {
-  try {
-    startWorker();
-    console.log('[queue] worker started');
-  } catch (err) {
-    console.error('[queue] failed to start worker', err);
-  }
+async function bootstrap(): Promise<void> {
+  // Start the BullMQ worker in-process. For production deployments this would
+  // typically run in its own service; single-process is fine for dev + v1.
+  if (env.redisUrl) {
+    try {
+      startWorker();
+      console.log('[queue] worker started');
+    } catch (err) {
+      console.error('[queue] failed to start worker', err);
+    }
 
-  // Postgres is the source of truth for what should be scheduled; rebuild the
-  // BullMQ schedulers from it on every boot so Redis loss can't silently kill
-  // schedules. Failure here is logged loudly but doesn't stop the server —
-  // manual runs and the API still work without schedules.
-  if (env.databaseUrl) {
-    void reconcileSchedules()
-      .then(({ upserted, removed }) => {
-        console.log(`[queue] schedules reconciled from Postgres (${upserted} active, ${removed} orphaned removed)`);
-      })
-      .catch((err) => {
+    // Postgres is the source of truth for what should be scheduled; rebuild the
+    // BullMQ schedulers from it before serving so Redis loss can't silently
+    // kill schedules. Failure is logged loudly but doesn't stop boot — manual
+    // runs and the API still work without schedules.
+    if (env.databaseUrl) {
+      try {
+        const { upserted, removed } = await reconcileSchedules();
+        console.log(
+          `[queue] schedules reconciled from Postgres (${upserted} active, ${removed} orphaned removed)`,
+        );
+      } catch (err) {
         console.error('[queue] schedule reconciliation failed — scheduled runs may not fire', err);
-      });
+      }
+    }
   }
+
+  // Close out runs orphaned by a previous crash/restart, then keep sweeping.
+  if (env.databaseUrl) {
+    startStaleRunSweeper();
+  }
+
+  server = app.listen(env.port, () => {
+    console.log(`[server] listening on http://localhost:${env.port}`);
+  });
 }
 
-// Close out runs orphaned by a previous crash/restart, then keep sweeping.
-if (env.databaseUrl) {
-  startStaleRunSweeper();
-}
+void bootstrap().catch((err) => {
+  console.error('[server] fatal error during boot', err);
+  process.exit(1);
+});
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`[server] received ${signal}, shutting down`);
-  server.close(() => undefined);
+  server?.close(() => undefined);
   await Promise.allSettled([closeQueue(), closeDatabase(), closeRedis(), closeScraper()]);
   process.exit(0);
 }

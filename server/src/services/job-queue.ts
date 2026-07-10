@@ -1,7 +1,7 @@
 import { Queue, Worker, type QueueOptions, type WorkerOptions } from 'bullmq';
 import { env } from '../config/env.js';
 import { findJob, listScheduledJobs } from '../db/jobs.js';
-import { createRun, findRun, findRunByQueueJobId } from '../db/runs.js';
+import { findOrCreateRunForQueueJob, findRun, findRunByQueueJobId } from '../db/runs.js';
 import { runJob, type RunSummary } from './job-runner.js';
 import { deliverForRun } from './webhooks.js';
 
@@ -54,47 +54,58 @@ export function startWorker(): Worker<ScrapeJobData> {
 
       // Run identity. Manual triggers pass runId in the payload; scheduled
       // jobs don't, so we key the run on the BullMQ job id. A stalled-job
-      // retry (worker crashed mid-run) carries the same BullMQ id, so it
-      // reattaches to the run the crashed attempt opened instead of creating
-      // a duplicate row — and if that run somehow already reached a terminal
-      // state, we return it untouched rather than running twice.
+      // retry (BullMQ re-queues a job whose worker lost its lock — i.e. the
+      // original attempt is presumed dead) carries the same BullMQ id.
+      //
+      //   - already terminal → skip re-running, but still fall through to
+      //     webhook delivery below (a crash between run-finalize and webhook
+      //     send would otherwise drop the webhook permanently).
+      //   - non-terminal / absent → find-or-create the run (atomic via the
+      //     partial UNIQUE index, so concurrent processing can't duplicate the
+      //     row) and run it. Re-running a non-terminal run is the intended
+      //     crash-recovery behaviour; updateRun is idempotent on the row.
       let effectiveRunId = runId;
+      let summary: RunSummary;
+      let alreadyTerminal = false;
+
       if (!effectiveRunId && job.id) {
         const existing = await findRunByQueueJobId(String(job.id));
-        if (existing) {
-          if (existing.status === 'completed' || existing.status === 'failed') {
-            return {
-              runId: existing.id,
-              jobId: existing.job_id,
-              status: existing.status,
-              itemsExtracted: existing.items_extracted,
-              tokensUsed: existing.tokens_used,
-              error: existing.error_message ?? undefined,
-              errorType: existing.error_type ?? undefined,
-            } satisfies RunSummary;
-          }
-          effectiveRunId = existing.id;
+        if (existing && (existing.status === 'completed' || existing.status === 'failed')) {
+          alreadyTerminal = true;
+          summary = {
+            runId: existing.id,
+            jobId: existing.job_id,
+            status: existing.status,
+            itemsExtracted: existing.items_extracted,
+            tokensUsed: existing.tokens_used,
+            error: existing.error_message ?? undefined,
+            errorType: existing.error_type ?? undefined,
+          };
         } else {
-          const created = await createRun(jobId, String(job.id));
-          effectiveRunId = created.id;
+          const run = existing ?? (await findOrCreateRunForQueueJob(jobId, String(job.id)));
+          effectiveRunId = run.id;
         }
       }
 
-      const summary = await runJob(row, effectiveRunId);
+      if (!alreadyTerminal) {
+        summary = await runJob(row, effectiveRunId);
+      }
+
       // Webhook delivery is best-effort: failures are persisted on the run row
       // (webhook_status / webhook_last_error) but never bubble up to fail the
-      // queue job. The receiver might be down for unrelated reasons.
-      if (row.webhook_url) {
+      // queue job. Skip if already delivered so a terminal-reattach retry
+      // doesn't double-send; a previously *failed* delivery is retried.
+      if (row.webhook_url && (summary!.status === 'completed' || summary!.status === 'failed')) {
         try {
-          const runRow = await findRun(userId, summary.runId);
-          if (runRow) {
+          const runRow = await findRun(userId, summary!.runId);
+          if (runRow && runRow.webhook_status !== 'success') {
             await deliverForRun({ job: row, userId, run: runRow });
           }
         } catch (err) {
           console.error('[webhook] delivery error', err);
         }
       }
-      return summary;
+      return summary!;
     },
     opts,
   );

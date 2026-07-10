@@ -238,7 +238,9 @@ export async function listScheduledJobs(): Promise<ScheduledJobRef[]> {
   const { rows } = await getPool().query<ScheduledJobRef>(
     `SELECT id, user_id, schedule
        FROM scrape_jobs
-      WHERE enabled = true AND schedule IS NOT NULL`,
+      WHERE enabled = true
+        AND schedule IS NOT NULL
+        AND btrim(schedule) <> ''`,
   );
   return rows;
 }

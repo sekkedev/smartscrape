@@ -22,3 +22,5 @@ test-results/
 
 # Local agent worktrees / config
 .claude/
+
+.env.dockertest

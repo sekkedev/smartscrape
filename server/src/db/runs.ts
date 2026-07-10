@@ -97,14 +97,38 @@ export async function createRun(jobId: string, queueJobId?: string | null): Prom
 /**
  * Find the run created for a specific BullMQ job id. Lets a stalled-job retry
  * attach to the run the crashed attempt already created instead of opening a
- * duplicate row. Newest first in the (theoretical) case of collisions.
+ * duplicate row.
  */
 export async function findRunByQueueJobId(queueJobId: string): Promise<RunRow | null> {
   const { rows } = await getPool().query<RunRow>(
-    `SELECT * FROM scrape_runs WHERE queue_job_id = $1 ORDER BY started_at DESC LIMIT 1`,
+    `SELECT * FROM scrape_runs WHERE queue_job_id = $1 LIMIT 1`,
     [queueJobId],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Find-or-create the run for a BullMQ job id, atomically. The partial UNIQUE
+ * index on queue_job_id makes concurrent inserts collapse to one row: the
+ * loser's INSERT hits ON CONFLICT DO NOTHING and re-reads the winner. This
+ * prevents duplicate run rows when a stalled job is re-processed while (or
+ * just after) the original attempt was still creating its run.
+ */
+export async function findOrCreateRunForQueueJob(
+  jobId: string,
+  queueJobId: string,
+): Promise<RunRow> {
+  const { rows } = await getPool().query<RunRow>(
+    `INSERT INTO scrape_runs (job_id, status, queue_job_id)
+       VALUES ($1, 'pending', $2)
+       ON CONFLICT (queue_job_id) WHERE queue_job_id IS NOT NULL DO NOTHING
+       RETURNING *`,
+    [jobId, queueJobId],
+  );
+  if (rows[0]) return rows[0];
+  const existing = await findRunByQueueJobId(queueJobId);
+  if (existing) return existing;
+  throw new Error(`Could not find or create run for queue job ${queueJobId}`);
 }
 
 /**
