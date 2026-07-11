@@ -4,7 +4,7 @@ Thanks for considering a contribution. This guide is short on purpose; if someth
 
 ## Dev setup
 
-Prereqs: Node 20+, Docker Desktop (or compatible), npm 10+.
+Prereqs: Node 20.19+ or 22.12+ (required by the Vite 7 toolchain), Docker Desktop (or compatible), npm 10+.
 
 ```bash
 git clone https://github.com/9ny4/smartscrape.git
