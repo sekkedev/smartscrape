@@ -61,7 +61,7 @@ AI provider keys (never displayed after save), Google Sheets OAuth, Telegram bot
 
 ## Quickstart
 
-Prereqs: Docker (or Node 20+ for the dev path), `npm` 10+.
+Prereqs: Docker (or Node 20.19+ / 22.12+ for the dev path — the Vite 7 toolchain requires it), `npm` 10+.
 
 ### Self-host (Docker, recommended)
 
