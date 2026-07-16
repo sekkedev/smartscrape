@@ -4,13 +4,30 @@
 // but node + production deps (node-pg-migrate, dotenv). The previous TS
 // version needed tsx (a devDependency) and imported src/config/env.ts (not
 // shipped in the runtime image), which made the container crash-loop at boot.
-import 'dotenv/config';
-import { dirname, resolve } from 'node:path';
+import dotenv from 'dotenv';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { runner } from 'node-pg-migrate';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load the nearest .env walking up from this script, mirroring
+// src/config/env.ts. `npm run --workspace server` sets cwd to server/, so a
+// bare `import 'dotenv/config'` would miss the repo-root .env the README
+// tells devs to create. Real env vars (Docker/CI) always win: dotenv never
+// overrides variables that are already set.
+for (let dir = __dirname; ; ) {
+  const candidate = join(dir, '.env');
+  if (existsSync(candidate)) {
+    dotenv.config({ path: candidate });
+    break;
+  }
+  const parent = dirname(dir);
+  if (parent === dir) break;
+  dir = parent;
+}
+
 const migrationsDir = resolve(__dirname, '..', 'migrations');
 
 if (!existsSync(migrationsDir)) {
