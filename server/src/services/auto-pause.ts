@@ -16,12 +16,21 @@ export const AUTO_PAUSE_THRESHOLD = 3;
  * Return whether the latest `AUTO_PAUSE_THRESHOLD` runs for a job are all
  * 'failed'. Considers only terminal runs (completed | failed) — a still-in-
  * flight run (pending/scraping/extracting) doesn't break the streak.
+ *
+ * Quota-limited runs (`error_type = 'quota_error'`) and crash-orphaned runs
+ * closed by the stale-run sweeper (`'interrupted'`) are excluded from the
+ * window entirely: neither says anything about the job's health, and counting
+ * them would let a busy-but-healthy schedule pause itself the moment the
+ * daily quota bites three ticks in a row — or the moment the server restarts
+ * during three scheduled runs.
  */
 export async function isInFailureStreak(jobId: string): Promise<boolean> {
   const { rows } = await getPool().query<{ status: string }>(
     `SELECT status
        FROM scrape_runs
-      WHERE job_id = $1 AND status IN ('completed', 'failed')
+      WHERE job_id = $1
+        AND status IN ('completed', 'failed')
+        AND (error_type IS NULL OR error_type NOT IN ('quota_error', 'interrupted'))
       ORDER BY started_at DESC
       LIMIT $2`,
     [jobId, AUTO_PAUSE_THRESHOLD],

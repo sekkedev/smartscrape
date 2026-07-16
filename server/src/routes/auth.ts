@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { refreshCookieOptions } from '../lib/session.js';
 import {
+  countUsers,
   createUser,
   clearResetToken,
   deleteUser,
@@ -124,6 +125,21 @@ function resetUrl(token: string): string {
 
 authRouter.post('/register', authEntryLimiter, validate(registerSchema), async (req, res) => {
   const { email, password, name } = req.body as z.infer<typeof registerSchema>;
+
+  // Registration gate: closed by default in production (see env.ts). The very
+  // first user is always allowed through so a fresh self-hosted install can
+  // bootstrap its operator account without flipping env vars twice.
+  if (!env.registrationEnabled && (await countUsers()) > 0) {
+    res
+      .status(403)
+      .json(
+        fail(
+          'REGISTRATION_DISABLED',
+          'Registration is disabled on this instance. Ask the operator for an account.',
+        ),
+      );
+    return;
+  }
 
   const existing = await findUserByEmail(email);
   if (existing) {

@@ -45,10 +45,9 @@ RUN npm ci --omit=dev --workspaces
 # Built artifacts.
 COPY --from=build /app/server/dist ./server/dist
 COPY --from=build /app/client/dist ./client/dist
-# Migrations + the runner that applies them.
+# Migrations + the plain-node runner that applies them (no dev deps needed).
 COPY server/migrations ./server/migrations
 COPY server/scripts ./server/scripts
-COPY server/tsconfig.json server/tsconfig.scripts.json ./server/
 
 # Drop root for runtime. The Playwright image ships a `pwuser`.
 USER pwuser
@@ -56,5 +55,6 @@ USER pwuser
 EXPOSE 3000
 
 # Apply pending migrations on startup, then start the API + worker.
-# Using `sh -c` so $PORT can be honoured from the env.
-CMD ["sh", "-c", "npm run migrate:up --workspace server && node server/dist/index.js"]
+# Plain `node` invocations: the runtime image has no tsx and no server/src,
+# which is exactly why the previous npm-run/tsx CMD crash-looped here.
+CMD ["sh", "-c", "node server/scripts/migrate.mjs up && node server/dist/index.js"]

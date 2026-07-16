@@ -1,3 +1,4 @@
+import { env } from '../config/env.js';
 import { getPool } from '../config/database.js';
 import { decrypt } from '../config/encryption.js';
 import { findForUser as findApiKey, PROVIDERS } from '../db/apiKeys.js';
@@ -74,7 +75,7 @@ async function failAndMaybePause(args: {
  *   - for each URL: scrape \u2192 extract \u2192 hash \u2192 insert extracted_data
  *   - update the run row with final status + counters
  */
-export const DAILY_RUN_QUOTA = 100;
+export const DAILY_RUN_QUOTA = env.dailyRunQuota;
 
 export async function runJob(job: JobRow, existingRunId?: string): Promise<RunSummary> {
   const run = existingRunId ? { id: existingRunId, job_id: job.id } : await createRun(job.id);

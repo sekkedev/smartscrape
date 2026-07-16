@@ -18,6 +18,9 @@ export const ERROR_TYPES = [
   'ai_error',
   'network_error',
   'quota_error',
+  // Set explicitly by the stale-run sweeper for runs orphaned by a crash or
+  // restart — the classifier below never produces it from a message.
+  'interrupted',
   'unknown',
 ] as const;
 

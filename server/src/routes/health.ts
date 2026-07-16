@@ -8,7 +8,9 @@ export const healthRouter = Router();
 healthRouter.get('/', async (_req, res) => {
   const [db, redis] = await Promise.all([pingDatabase(), pingRedis()]);
   const status = db.ok && redis.ok ? 'healthy' : 'degraded';
-  res.status(200).json(
+  // 503 on degraded so the Docker healthcheck and external uptime monitors
+  // actually fire on a DB/Redis outage — a 200 'degraded' is invisible to both.
+  res.status(status === 'healthy' ? 200 : 503).json(
     ok({
       status,
       checks: {

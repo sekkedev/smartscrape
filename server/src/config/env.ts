@@ -33,13 +33,40 @@ function optional(name: string, fallback = ''): string {
   return process.env[name] ?? fallback;
 }
 
+function optionalPositiveInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer, got: ${raw}`);
+  }
+  return parsed;
+}
+
+/**
+ * Registration policy: explicit REGISTRATION_ENABLED=true/false wins; the
+ * default is open in development and closed in production, because an
+ * internet-reachable self-hosted instance should not accept strangers.
+ * The /register route always allows the very first user (bootstrap).
+ */
+function registrationEnabled(nodeEnv: string): boolean {
+  const raw = process.env.REGISTRATION_ENABLED;
+  if (raw !== undefined && raw !== '') return raw === 'true' || raw === '1';
+  return nodeEnv !== 'production';
+}
+
+const nodeEnv = optional('NODE_ENV', 'development');
+
 export const env = {
-  nodeEnv: optional('NODE_ENV', 'development'),
+  nodeEnv,
   port: Number.parseInt(optional('PORT', '3000'), 10),
   databaseUrl: optional('DATABASE_URL'),
   redisUrl: optional('REDIS_URL'),
   appUrl: optional('APP_URL', 'http://localhost:5173'),
   apiUrl: optional('API_URL', 'http://localhost:3000'),
+  /** Max runs per user per rolling 24h. Raise for pilot workloads (e.g. 300). */
+  dailyRunQuota: optionalPositiveInt('DAILY_RUN_QUOTA', 100),
+  registrationEnabled: registrationEnabled(nodeEnv),
   smtp: {
     host: optional('SMTP_HOST'),
     port: Number.parseInt(optional('SMTP_PORT', '587'), 10),

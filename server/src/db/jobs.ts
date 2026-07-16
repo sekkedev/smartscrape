@@ -227,6 +227,24 @@ export async function findJob(userId: string, jobId: string): Promise<JobRow | n
   return rows[0] ?? null;
 }
 
+export type ScheduledJobRef = { id: string; user_id: string; schedule: string };
+
+/**
+ * All enabled jobs with a schedule, across every user. Source of truth for
+ * boot-time reconciliation of BullMQ job schedulers — Postgres decides what
+ * should be scheduled; Redis is only a derived cache of that answer.
+ */
+export async function listScheduledJobs(): Promise<ScheduledJobRef[]> {
+  const { rows } = await getPool().query<ScheduledJobRef>(
+    `SELECT id, user_id, schedule
+       FROM scrape_jobs
+      WHERE enabled = true
+        AND schedule IS NOT NULL
+        AND btrim(schedule) <> ''`,
+  );
+  return rows;
+}
+
 export type UpdateJobArgs = Partial<CreateJobArgs>;
 
 export async function updateJob(
