@@ -7,7 +7,7 @@ Thanks for considering a contribution. This guide is short on purpose; if someth
 Prereqs: Node 20.19+ or 22.12+ (required by the Vite 7 toolchain), Docker Desktop (or compatible), npm 10+.
 
 ```bash
-git clone https://github.com/9ny4/smartscrape.git
+git clone https://github.com/sekkedev/smartscrape.git
 cd smartscrape
 npm install
 npx playwright install chromium

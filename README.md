@@ -1,6 +1,6 @@
 # SmartScrape
 
-[![CI](https://github.com/9ny4/smartscrape/actions/workflows/ci.yml/badge.svg)](https://github.com/9ny4/smartscrape/actions/workflows/ci.yml)
+[![CI](https://github.com/sekkedev/smartscrape/actions/workflows/ci.yml/badge.svg)](https://github.com/sekkedev/smartscrape/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -66,7 +66,7 @@ Prereqs: Docker (or Node 20.19+ / 22.12+ for the dev path — the Vite 7 toolcha
 ### Self-host (Docker, recommended)
 
 ```bash
-git clone https://github.com/9ny4/smartscrape.git
+git clone https://github.com/sekkedev/smartscrape.git
 cd smartscrape
 cp .env.example .env
 # Fill in the three required secrets — generation snippets are inside .env.example.
@@ -79,7 +79,7 @@ Open <http://localhost:3000>. Migrations run on container start; the API also se
 ### Develop
 
 ```bash
-git clone https://github.com/9ny4/smartscrape.git
+git clone https://github.com/sekkedev/smartscrape.git
 cd smartscrape
 npm install
 npx playwright install chromium

@@ -7,7 +7,7 @@ import { isAllowedByRobots } from './robots.js';
 import { pickUserAgent } from '../lib/user-agents.js';
 import { STEALTH_INIT_SCRIPT } from '../lib/stealth.js';
 
-const USER_AGENT = 'SmartScrapeBot/0.1 (+https://github.com/9ny4/smartscrape)';
+const USER_AGENT = 'SmartScrapeBot/0.1 (+https://github.com/sekkedev/smartscrape)';
 // A realistic Chrome UA used on the Playwright fallback path where we want to
 // look as close to a real browser as possible. The bot UA above is kept for
 // static fetches so well-behaved sites can identify us.
